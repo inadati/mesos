@@ -12,7 +12,7 @@ Mesosは、各クラスタノードで動作する**agent**デーモンを管理
 
 <!-- The above figure shows the main components of Mesos.  Mesos consists of a *master* daemon that manages *agent* daemons running on each cluster node, and *Mesos frameworks* that run *tasks* on these agents. -->
 
-masterはフレームワークへの**リソースオファー**によってCPUやRAMなどフレームワーク間でのきめ細かいリソース共有を可能にします。
+マスターはフレームワークへの**リソースオファー**によってCPUやRAMなどフレームワーク間でのきめ細かいリソース共有を可能にします。
 
 <!-- [The master] enables fine-grained sharing of resources (CPU, RAM, ...) across
 frameworks by making them *resource offers*. -->
@@ -26,31 +26,72 @@ of `<agent ID, resource1: amount1, resource2: amount2, ...>` (NOTE: as
 keyword 'slave' is deprecated in favor of 'agent', driver-based frameworks will
 still receive offers with slave ID, whereas frameworks using the v1 HTTP API receive offers with agent ID).  -->
 
-masterはリソースの適切な共有や厳格な優先順位などのポリシーに従って各フレームワークに提供するリソース量を決定します。
+マスターはリソースの適切な共有や厳格な優先順位などのポリシーに従って各フレームワークに提供するリソース量を決定します。
 
 <!-- The master decides *how many* resources to offer to each framework according to a given organizational policy, such as fair sharing or strict priority.  -->
 
-多様なポリシーに対応するために、masterはモジュール式のアーキテクチャを採用しており、新しい**アロケーションモジュール**をプラグインとして簡単に追加する事ができます。
+多様なポリシーに対応するために、マスターはモジュール式のアーキテクチャを採用しており、新しい**アロケーションモジュール**をプラグインとして簡単に追加する事ができます。
 
 <!-- To support a diverse set of policies, the master employs a modular architecture that makes it easy to add new allocation modules via a plugin mechanism. -->
 
-A framework running on top of Mesos consists of two components: a *scheduler* that registers with the master to be offered resources, and an *executor* process that is launched on agent nodes to run the framework's tasks (see the [App/Framework development guide](app-framework-development-guide.md) for more details about framework schedulers and executors). While the master determines **how many** resources are offered to each framework, the frameworks' schedulers select **which** of the offered resources to use. When a framework accepts offered resources, it passes to Mesos a description of the tasks it wants to run on them. In turn, Mesos launches the tasks on the corresponding agents.
+Mesos上で動作するフレームワークは提供されたリソースの登録を行う**スケジューラー**とエージェントノード上でタスクを実行する**エグゼキューター**の2つのコンポーネントで構成されます。(スケジューラーとエグゼキューターについての詳細は[App/Framework development guide](app-framework-development-guide.md)をご覧ください。)
 
-## Example of resource offer
+<!-- A framework running on top of Mesos consists of two components: a *scheduler* that registers with the master to be offered resources, and an *executor* process that is launched on agent nodes to run the framework's tasks (see the [App/Framework development guide](app-framework-development-guide.md) for more details about framework schedulers and executors). -->
 
-The figure below shows an example of how a framework gets scheduled to run a task.
+マスターは各フレームワークへのリソースの提供数を決定するのに対し、フレームワークのスケジューラーは与えられたリソースのうちどのリソースを利用するのかを選択します。
+
+<!-- While the master determines **how many** resources are offered to each framework, the frameworks' schedulers select **which** of the offered resources to use.  -->
+
+フレームワークはリソースが提供されると、そのリソース上でどのタスクを実行するのかをマスターに伝えます。
+すると、マスターは対応するエージェント上でタスクを起動します。
+
+<!-- When a framework accepts offered resources, it passes to Mesos a description of the tasks it wants to run on them. In turn, Mesos launches the tasks on the corresponding agents. -->
+
+## リソースオファーの一例
+
+下図はフレームワークがどの様にタスクをスケジューリングするのかの例です。
+<!-- The figure below shows an example of how a framework gets scheduled to run a task. -->
 
 ![Mesos Architecture](images/architecture-example.jpg)
 
-Let's walk through the events in the figure.
+図のイベントを順に見ていきましょう。
+<!-- Let's walk through the events in the figure. -->
 
-1. Agent 1 reports to the master that it has 4 CPUs and 4 GB of memory free. The master then invokes the allocation policy module, which tells it that framework 1 should be offered all available resources.
-1. The master sends a resource offer describing what is available on agent 1 to framework 1.
-1. The framework's scheduler replies to the master with information about two tasks to run on the agent, using <2 CPUs, 1 GB RAM> for the first task, and <1 CPUs, 2 GB RAM> for the second task.
-1. Finally, the master sends the tasks to the agent, which allocates appropriate resources to the framework's executor, which in turn launches the two tasks (depicted with dotted-line borders in the figure). Because 1 CPU and 1 GB of RAM are still unallocated, the allocation module may now offer them to framework 2.
+1. Agent 1はマスターに対して4つのCPUと4GBのメモリの空きがある事を伝えます。するとマスターはアロケーションモジュールを起動しFramework 1に対して可用な全てのリソースを提供するよう指示します。
+1. その際にマスターはAgent 1で利用可能な空きリソースを記載したリソースオファーをFramework 1へ送信します。
+1. フレームワークのスケジューラーはマスターに対してエージェント上で実行する2つのタスクに関する情報を返信します。1つ目のタスクには<2CPU、1GB RAM>、2つ目のタスクには<1CPU、2GB RAM>を使用します。
+1. 最後にマスターはエージェントにタスクを送信し、エージェントはフレームワークのエグゼキューターに適切なリソースを割り当て、エグゼキューターは2つのタスクを起動します。（図では点線の枠で示されています。）Agent 1にはまだ1CPUと1GBの空きがあるため、アロケーションモジュールはそのリソースの空きをFramework 2に与える事ができます。
 
-In addition, this resource offer process repeats when tasks finish and new resources become free.
+<!-- 1. Agent 1 reports to the master that it has 4 CPUs and 4 GB of memory free. The master then invokes the allocation policy module, which tells it that framework 1 should be offered all available resources. -->
 
-While the thin interface provided by Mesos allows it to scale and allows the frameworks to evolve independently, one question remains: how can the constraints of a framework be satisfied without Mesos knowing about these constraints? For example, how can a framework achieve data locality without Mesos knowing which nodes store the data required by the framework? Mesos answers these questions by simply giving frameworks the ability to **reject** offers. A framework will reject the offers that do not satisfy its constraints and accept the ones that do.  In particular, we have found that a simple policy called delay scheduling, in which frameworks wait for a limited time to acquire nodes storing the input data, yields nearly optimal data locality.
 
-You can also read much more about the Mesos architecture in this [technical paper](https://www.usenix.org/conference/nsdi11/mesos-platform-fine-grained-resource-sharing-data-center).
+<!-- 1. The master sends a resource offer describing what is available on agent 1 to framework 1. -->
+<!-- 1. The framework's scheduler replies to the master with information about two tasks to run on the agent, using <2 CPUs, 1 GB RAM> for the first task, and <1 CPUs, 2 GB RAM> for the second task. -->
+<!-- 1. Finally, the master sends the tasks to the agent, which allocates appropriate resources to the framework's executor, which in turn launches the two tasks (depicted with dotted-line borders in the figure). Because 1 CPU and 1 GB of RAM are still unallocated, the allocation module may now offer them to framework 2. -->
+
+また、このリソース提供のプロセスはタスクが終了して新たなリソースの空きが出来た場合、繰り返し行われます。
+
+<!-- In addition, this resource offer process repeats when tasks finish and new resources become free. -->
+
+Mesosが提供する薄いインターフェイスのおかげでフレームワークは独立した発展が可能であり、それによりMesosは高い拡張性を得ていますが、1つの問題が残ります。Mesosはどの様にしてフレームワーク上の制限を把握する事なく、それらの制限に従う事ができるのでしょうか？
+
+<!-- While the thin interface provided by Mesos allows it to scale and allows the frameworks to evolve independently, one question remains: how can the constraints of a framework be satisfied without Mesos knowing about these constraints?  -->
+
+例えば、フレームワークが必要とするデータがどのノードに存在してるのかを把握しないMesosの下で、フレームワークはどの様にしてデータローカリティを実現するのでしょうか？
+
+<!-- For example, how can a framework achieve data locality without Mesos knowing which nodes store the data required by the framework?  -->
+Mesosはフレームワークにオファーを拒否する機能を与えることでこの問題を解消しています。
+
+<!-- Mesos answers these questions by simply giving frameworks the ability to **reject** offers.  -->
+
+フレームワークはフレームワーク上の制限を満たさないオファーを拒否し、制限を満たすオファーのみを受け入れます。
+
+<!-- A framework will reject the offers that do not satisfy its constraints and accept the ones that do.   -->
+
+特に、入力データを格納するノードを得るためにフレームワークを一定時間待機させる「ディレイスケジューリング」というシンプルなポリシーによって、かなり最適なデータローカリティが実現出来ることが知られています。
+
+<!-- In particular, we have found that a simple policy called delay scheduling, in which frameworks wait for a limited time to acquire nodes storing the input data, yields nearly optimal data locality. -->
+
+Mesosアーキテクチャについてのさらに詳しい情報はこちらをご覧ください。[technical paper](https://www.usenix.org/conference/nsdi11/mesos-platform-fine-grained-resource-sharing-data-center)
+
+<!-- You can also read much more about the Mesos architecture in this [technical paper](https://www.usenix.org/conference/nsdi11/mesos-platform-fine-grained-resource-sharing-data-center). -->

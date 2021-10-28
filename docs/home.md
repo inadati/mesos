@@ -3,40 +3,40 @@ title: Apache Mesos - Documentation Home
 layout: documentation
 ---
 
-## Fundamentals
-* [Mesos Architecture](architecture.md) providing an overview of Mesos concepts.
-* [Video and Slides of Mesos Presentations](presentations.md)
-* [Academic Papers and Project History](https://www.usenix.org/conference/nsdi11/mesos-platform-fine-grained-resource-sharing-data-center)
-* [Mesos Release and Support Policy](versioning.md)
+## 基本編
+* [Mesos アーキテクチャ](architecture.md) Mesosのコンセプトの概要
+* [Mesosプレゼンテーションの動画とスライド](presentations.md)
+* [学術論文とプロジェクトの履歴](https://www.usenix.org/conference/nsdi11/mesos-platform-fine-grained-resource-sharing-data-center)
+* [Mesosのリリースとサポートポリシー](versioning.md)
 
-## Build / Installation
-* [Building](building.md) for basic instructions on compiling and installing Mesos.
-* [Binary Packages](binary-packages.md) for how to use Mesos binary packages.
-* [Configuration](configuration.md) for build configuration options.
-* [CMake](cmake.md) for details about using the new CMake build system.
-* [Windows Support](windows.md) for the state of Windows support in Mesos.
+## ビルド / インストール
+* [ビルド](building.md) Mesosのコンパイルとインストールの基本的な手順
+* [バイナリーパッケージ](binary-packages.md) Mesosのバイナリーパッケージの使用方法
+* [設定](configuration.md) ビルド設定オプションを説明しています。
+* [CMake](cmake.md) 新しいCMakeシステムの仕様についての詳細
+* [Windowsサポート](windows.md) MesosでのWindowsサポートの状況
 
-## Administration
-* [Configuration](configuration.md) for command-line arguments.
-* [High Availability Master Setup](high-availability.md)
-  * [Replicated Log](replicated-log-internals.md) for information on the Mesos replicated log.
-* [Fault Tolerant Agent Setup](agent-recovery.md)
-* [Framework Rate Limiting](framework-rate-limiting.md)
-* [Maintenance](maintenance.md) for performing maintenance on a Mesos cluster.
-* [Upgrades](upgrades.md) for upgrading a Mesos cluster.
-* [Downgrades](downgrades.md) for downgrading a Mesos cluster.
-* [Logging](logging.md)
-* [Monitoring / Metrics](monitoring.md)
-* [Debugging using the new CLI](cli.md)
-* [Operational Guide](operational-guide.md)
-* [Fetcher Cache Configuration](fetcher.md)
-* [Fault Domains](fault-domains.md)
-* [Performance Profiling](performance-profiling.md) for debugging performance issues in Mesos.
-* [Memory Profiling](memory-profiling.md) for debugging potential memory leaks in Mesos.
+## 運用管理
+* [設定](configuration.md) コマンドラインの引数の設定
+* [高可用マスターのセットアップ](high-availability.md)
+  * [ログのレプリケーション](replicated-log-internals.md) Mesosのレプリケーションされたログにおける情報
+* [耐障害性エージェントのセットアップ](agent-recovery.md)
+* [フレームワークの速度制限](framework-rate-limiting.md)
+* [メンテナンス](maintenance.md) Mesosクラスターのメンテナンスのために
+* [アップグレード](upgrades.md) Mesosクラスターのアップグレード
+* [ダウングレード](downgrades.md) Mesosクラスターのダウングレード
+* [ロギング](logging.md)
+* [モニタリング / メトリクス](monitoring.md)
+* [新しいCLIを使ったデバッグ](cli.md)
+* [運用ガイド](operational-guide.md)
+* [フェッチャーのキャッシュ設定](fetcher.md)
+* [障害領域](fault-domains.md)
+* [パフォーマンスのデバッグ](performance-profiling.md) Mesosにおけるパフォーマンスの問題のデバッグ
+* [メモリのデバッグ](memory-profiling.md) Mesosにおける潜在的なメモリリークのデバッグ
 
-## Resource Management
-* [Attributes and Resources](attributes-resources.md) for how to describe the agents that comprise a cluster.
-* [Using Resource Roles](roles.md)
+## リソース管理
+* [属性とリソース](attributes-resources.md) クラスターを構成するエージェントの説明
+* [リソースロールの使用](roles.md)
   * [Resource Role Weights](weights.md) for fair sharing.
   * [Resource Role Quota](quota.md) for how to configure Mesos to provide guaranteed resource allocations for use by a role.
   * [Reservations](reservation.md) for how operators and frameworks can reserve resources on individual agents for use by a role.

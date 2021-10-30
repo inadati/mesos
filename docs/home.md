@@ -37,8 +37,8 @@ layout: documentation
 ## リソース管理
 * [属性とリソース](attributes-resources.md) クラスターを構成するエージェントの説明
 * [リソースロールの使用](roles.md)
-  * [Resource Role Weights](weights.md) for fair sharing.
-  * [Resource Role Quota](quota.md) for how to configure Mesos to provide guaranteed resource allocations for use by a role.
+  * [リソースロールウェイト](weights.md) 適切なリソース共有
+  * [リソースロールクオータ](quota.md) リソースロールにクオータを設けるようにMesosを設定する方法
   * [Reservations](reservation.md) for how operators and frameworks can reserve resources on individual agents for use by a role.
   * [Shared Resources](shared-resources.md) for how to share persistent volumes between tasks managed by different executors on the same agent.
 * [Oversubscription](oversubscription.md) for how to configure Mesos to take advantage of unused resources to launch "best-effort" tasks.

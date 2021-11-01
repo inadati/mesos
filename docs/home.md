@@ -39,49 +39,49 @@ layout: documentation
 * [リソースロールの使用](roles.md)
   * [リソースロールウェイト](weights.md) 適切なリソース共有
   * [リソースロールクオータ](quota.md) リソースロールにクオータを設けるようにMesosを設定する方法
-  * [Reservations](reservation.md) for how operators and frameworks can reserve resources on individual agents for use by a role.
-  * [Shared Resources](shared-resources.md) for how to share persistent volumes between tasks managed by different executors on the same agent.
-* [Oversubscription](oversubscription.md) for how to configure Mesos to take advantage of unused resources to launch "best-effort" tasks.
+  * [予約](reservation.md) オペレータやフレームワークが、役割に応じて個々のエージェントのリソースを予約する方法
+  * [共有リソース](shared-resources.md) 同一エージェント上の異なるエクゼキュータが管理するタスク間で永続ボリュームを共有する方法
+* [過剰供給](oversubscription.md) 未使用のリソースを駆使して最善のタスクを起動するようMesosを設定する方法
 
-## Security
-* [Authentication](authentication.md)
-* [Authorization](authorization.md)
+## セキュリティ
+* [認証](authentication.md)
+* [認可](authorization.md)
 * [SSL](ssl.md)
-* [Secrets](secrets.md) for managing secrets within Mesos.
+* [Secrets](secrets.md) Mesos内で秘密情報を管理するためのものです。
 
-## Containerization
-* [Containerizer Overview](containerizers.md)
-  * [Containerizer Internals](containerizer-internals.md) for implementation details of containerizers.
-  * [Docker Containerizer](docker-containerizer.md) for launching a Docker image as a Task, or as an Executor.
-  * [Mesos Containerizer](mesos-containerizer.md) default containerizer, supports both Linux and POSIX systems.
-    * [Container Images](container-image.md) for supporting container images in Mesos containerizer.
-    * [Docker Volume Support](isolators/docker-volume.md)
-    * [Nvidia GPU Support](gpu-support.md) for how to run Mesos with Nvidia GPU support.
-* [Container Sandboxes](sandbox.md)
-* [Container Volumes](container-volume.md)
-* [Nested Container and Task Group (Pod)](nested-container-and-task-group.md)
-* [Standalone Containers](standalone-containers.md)
+## コンテナ化
+* [コンテナライザーの概要](containerizers.md)
+  * [コンテナライザーの内部](containerizer-internals.md) コンテナライザーの実装の詳細
+  * [Dockerコンテナライザー](docker-containerizer.md) タスクやエクゼキュータとしてDockerイメージを起動する
+  * [Mesosコンテナライザー](mesos-containerizer.md) デフォルトのコンテナライザーでLinuxとPOSIXシステムの両方をサポートしています。
+    * [コンテナイメージ](container-image.md) Mesosコンテナライザーでコンテナイメージをサポートする
+    * [Dockerボリュームサポート](isolators/docker-volume.md)
+    * [Nvidia GPUサポート](gpu-support.md) Nvidia GPUをサポートしたMesosを実行する方法
+* [コンテナSandbox](sandbox.md)
+* [コンテナボリューム](container-volume.md)
+* [ネストされたコンテナとタスクグループ(Pod)](nested-container-and-task-group.md)
+* [独立型コンテナ](standalone-containers.md)
 
-## Networking
-* [Networking Overview](networking.md)
-  * [Networking in Detail](networking-for-mesos-managed-containers.md)
-  * [Container Network Interface (CNI)](cni.md)
-  * [Port Mapping Isolator](isolators/network-port-mapping.md)
+## ネットワーク
+* [ネットワーク概要](networking.md)
+  * [ネットワークの詳細](networking-for-mesos-managed-containers.md)
+  * [コンテナ・ネットワーク・インターフェイス (CNI)](cni.md)
+  * [ポート・マッピング・アイソレータ](isolators/network-port-mapping.md)
 
-## Storage
-* [Multiple Disks](multiple-disk.md) for how to allow tasks to use multiple isolated disk resources.
-* [Persistent Volume](persistent-volume.md) for how to allow tasks to access persistent storage resources.
-* [Container Storage Interface (CSI) Support](csi.md)
+## ストレージ
+* [マルチディスク](multiple-disk.md) タスクが複数の独立したディスクリソースを使用できるようにする方法
+* [永続ボリューム](persistent-volume.md) タスクが永続的なストレージにアクセスできるようにする方法
+* [コンテナ・ストレージ・インターフェイス(CSI) サポート](csi.md)
 
-## Scheduler and Executor Development
-* [Running Workloads in Mesos](running-workloads.md) explains how a scheduler can specify and run tasks.
-* [Framework Development Guide](app-framework-development-guide.md) describes how to build applications on top of Mesos.
-* [Guide for Designing Highly Available Mesos Frameworks](high-availability-framework-guide.md)
-* [Reconciliation](reconciliation.md) for ensuring a framework's state remains eventually consistent in the face of failures.
-* [Task State Reasons](task-state-reasons.md) describes how task state reasons are used in Mesos.
-* [Task Health Checking](health-checks.md)
-* [v1 Scheduler HTTP API](scheduler-http-api.md) for communication between schedulers and the Mesos master.
-* [v1 Executor HTTP API](executor-http-api.md) describes the new HTTP API for communication between executors and the Mesos agent.
+## スケジューラーとエグゼキューターの開発
+* [Mesosでのワークロードの実行](running-workloads.md) スケジューラーがタスクを指定して実行する方法
+* [フレームワーク開発ガイド](app-framework-development-guide.md) Mesos上でアプリケーションを構築する方法
+* [高可用性Mesosフレームワークを設計するためのガイド](high-availability-framework-guide.md)
+* [整合性](reconciliation.md) フレームワークの障害時における整合性の保証
+* [タスクのステートリーズン](task-state-reasons.md) Mesosにおけるタスクのステートリーズンの使用方法
+* [タスクのヘルスチェック](health-checks.md)
+* [v1 Scheduler HTTP API](scheduler-http-api.md) スケジューラーとMesosマスター間の為のAPI
+* [v1 Executor HTTP API](executor-http-api.md) エクゼキュータとMesosエージェント間の通信のための新しいHTTP API
 
 ## APIs
 * [HTTP Endpoints](endpoints/) for available HTTP endpoints.

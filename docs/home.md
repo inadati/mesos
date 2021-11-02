@@ -84,55 +84,55 @@ layout: documentation
 * [v1 Executor HTTP API](executor-http-api.md) エクゼキュータとMesosエージェント間の通信のための新しいHTTP API
 
 ## APIs
-* [HTTP Endpoints](endpoints/) for available HTTP endpoints.
-* [API Client Libraries](api-client-libraries.md) lists client libraries for the HTTP APIs.
-* [API Versioning](versioning.md#api-versioning) describes HTTP API and release versioning.
-* [RecordIO](recordio.md) describes the RecordIO format used by the streaming endpoints of the HTTP API.
+* [HTTP エンドポイント](endpoints/) 利用可能なHTTPエンドポイント
+* [APIクライアントライブラリ](api-client-libraries.md) HTTP APIのクライアントライブラリの一覧
+* [APIのバージョニング](versioning.md#api-versioning) HTTP APIとリリースバージョニングについて
+* [RecordIO](recordio.md) HTTP APIのストリーミング・エンドポイントで使用されるRecordIOフォーマットについて
 * API References:
   * [v0 Java API](/api/latest/java/)
   * [v0 C++ API](/api/latest/c++/namespacemesos.html)
-  * [v1 Operator HTTP API](operator-http-api.md) for communication between operators and Mesos master/agent.
-  * [v1 Scheduler HTTP API](scheduler-http-api.md) for communication between schedulers and the Mesos master.
-  * [v1 Executor HTTP API](executor-http-api.md) describes the new HTTP API for communication between executors and the Mesos agent.
-* [Mesos Modules](modules.md) for specifying Mesos modules for master, agent and tests.
-  * [Allocation Module](allocation-module.md) for how to write custom resource allocators.
+  * [v1 Operator HTTP API](operator-http-api.md) オペレーターとMesosマスター/エージェントの間のコミュニケーションについて
+  * [v1 Scheduler HTTP API](scheduler-http-api.md) スケジューラーとMesosマスターの間の通信
+  * [v1 Executor HTTP API](executor-http-api.md) エクゼキューターとMesosエージェント間の通信のための新しいHTTP APIについて
+* [Mesosモジュール](modules.md) マスター、エージェント、およびテスト用のMesosモジュールを指定します。
+  * [アロケーションモジュール](allocation-module.md) カスタム・リソース・アロケータの作成方法
 
-## Community
-* [Getting Involved](/community/)
-* [List of Mesos Users](powered-by-mesos.md)
-* [3rd Party Frameworks](frameworks.md)
-* [3rd Party Tools](tools.md) for developers and operators.
-* [Development Roadmap](roadmap.md)
-* [Design Docs](design-docs.md) list of design documents for various Mesos features.
-* [Working groups](/community/#workinggroups) a listing of groups working on different components.
+## コミュニティ
+* [参加するには](/community/)
+* [Mesosユーザーの一覧](powered-by-mesos.md)
+* [サードパーティのフレームワーク](frameworks.md)
+* [サードパーティのツール](tools.md) 開発者とオペレーター向け
+* [開発のロードマップ](roadmap.md)
+* [設計資料](design-docs.md) 様々なMesosの機能の設計書のリストです。
+* [ワーキンググループ](/community/#workinggroups) さまざまなコンポーネントに取り組んでいるグループのリスト
 
-### Contributing
-* [Reporting an Issue, Improvement, or Feature](reporting-an-issue.md) for getting started with JIRA.
-* [Beginner Guide for Contributors](beginner-contribution.md) to get started contributing to Mesos for the first time.
-* [Advanced Contribution Guide](advanced-contribution.md) to learn the typical workflow used when contributing to Mesos.
-* [Engineering Principles and Practices](engineering-principles-and-practices.md) to serve as a shared set of project-level values for the community.
-* Style Guides:
-  * [Documentation Style Guide](documentation-guide.md)
-  * [Developer Guide](developer-guide.md) for best practices and patterns used in Mesos.
-  * [C++ Style Guide](c++-style-guide.md)
-    * [Clang-Format](clang-format.md) for automatic formatting.
-  * [Doxygen Style Guide](doxygen-style-guide.md)
-  * [Markdown Style Guide](markdown-style-guide.md)
-* [Testing Patterns](testing-patterns.md) for tips and tricks used in Mesos tests.
-* [C++ Doxygen Reference](/api/latest/c++/) for internal APIs.
-* [Committers and Maintainers](committers.md) a listing of project committers and component maintainers; useful when seeking feedback.
-  * [Committing](committing.md) guidelines for committing changes.
-  * [Release Guide](release-guide.md)
-  * [Committer Candidate Guidelines](committer-candidate-guidelines.md) for becoming a committer.
-* [Effective Code Reviewing](effective-code-reviewing.md) guidelines, tips, and learnings for how to do effective code reviews.
-* [Reopening a Review](reopening-reviews.md) for our policy around reviving reviews on ReviewBoard.
+### 貢献
+* [問題、修正、または新機能の要望](reporting-an-issue.md) JIRAを始めるために
+* [コントリビューターへの入門](beginner-contribution.md) Mesosへの初めての貢献について
+* [更に踏み込んだ貢献](advanced-contribution.md) Mesosに貢献する際の典型的なワークフロー
+* [エンジニアリングの原則と実践](engineering-principles-and-practices.md) プロジェクトレベルの価値観をコミュニティで共有するため
+* スタイルガイド:
+  * [ドキュメントのスタイルガイド](documentation-guide.md)
+  * [開発者ガイド](developer-guide.md) for best practices and patterns used in Mesos.
+  * [C++ スタイルガイド](c++-style-guide.md)
+    * [C言語フォーマット](clang-format.md) 自動整形
+  * [Doxygenスタイルガイド](doxygen-style-guide.md)
+  * [マークダウンスタイルガイド](markdown-style-guide.md)
+* [テストパターン](testing-patterns.md) Mesosのテストで使われるヒントやコツの紹介
+* [C++ Doxygen リファレンス](/api/latest/c++/) 内部API
+* [メンテナーとコミッター](committers.md) プロジェクトのコミッターやコンポーネントのメンテナのリスト
+  * [コミット](committing.md) 変更をコミットする際のガイドライン
+  * [リリースガイド](release-guide.md)
+  * [コミッター候補者のガイドライン](committer-candidate-guidelines.md) コミッターになるために
+* [効果的なコードレビュー](effective-code-reviewing.md) 効果的なコードレビューを行うためのガイドライン、ヒント、学習事項
+* [レビューの再開](reopening-reviews.md) レビューボードのレビューのreopenに関するポリシーについて
 
-## Books on Mesos
+## Mesos関連書籍
 
 <div class="row">
   <div class="col-xs-6 col-md-4">
     <a href="https://www.packtpub.com/big-data-and-business-intelligence/apache-mesos-cookbook" class="thumbnail">
-      <img src="https://d255esdrn735hr.cloudfront.net/sites/default/files/imagecache/ppv4_main_book_cover/9781785884627.png" alt="Apache Mesos Cookbook by David Blomquist, Tomasz Janiszewski">
+      <img src="https://static.packt-cdn.com/products/9781785884627/cover/smaller" alt="Apache Mesos Cookbook by David Blomquist, Tomasz Janiszewski">
     </a>
     <p class="text-center">Apache Mesos Cookbook by David Blomquist, Tomasz Janiszewski (Packt, August 2017)</p>
   </div>
@@ -144,19 +144,19 @@ layout: documentation
   </div>
   <div class="col-xs-6 col-md-4">
     <a href="https://www.packtpub.com/big-data-and-business-intelligence/mastering-mesos" class="thumbnail">
-      <img src="https://www.packtpub.com/sites/default/files/6249OS_5186%20Mastering%20Mesos.jpg" alt="Mastering Mesos by Dipa Dubhashi and Akhil Das">
+      <img src="https://learning.oreilly.com/library/cover/9781785886249/250w/" alt="Mastering Mesos by Dipa Dubhashi and Akhil Das">
     </a>
     <p class="text-center">Mastering Mesos by Dipa Dubhashi and Akhil Das (Packt, 2016)</p>
   </div>
   <div class="col-xs-6 col-md-4">
     <a href="https://www.packtpub.com/big-data-and-business-intelligence/apache-mesos-essentials" class="thumbnail">
-      <img src="https://www.packtpub.com/sites/default/files/9781783288762.png" alt="Apache Mesos Essentials by Dharmesh Kakadia">
+      <img src="https://covers.zlibcdn2.com/covers299/books/7c/19/a3/7c19a3e3ccb83decdca2efe62d3297de.jpg" alt="Apache Mesos Essentials by Dharmesh Kakadia">
     </a>
     <p class="text-center">Apache Mesos Essentials by Dharmesh Kakadia (Packt, 2015)</p>
   </div>
   <div class="col-xs-6 col-md-4">
     <a href="http://shop.oreilly.com/product/0636920039952.do" class="thumbnail">
-      <img src="http://akamaicovers.oreilly.com/images/0636920039952/lrg.jpg" alt="Building Applications on Mesos by David Greenberg">
+      <img src="https://books.google.com/books/publisher/content/images/frontcover/NLElCwAAQBAJ?fife=w200-h300" alt="Building Applications on Mesos by David Greenberg">
     </a>
     <p class="text-center">Building Applications on Mesos by David Greenberg (O'Reilly, 2015)</p>
   </div>

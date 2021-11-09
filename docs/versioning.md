@@ -48,7 +48,7 @@ Mesosのリリースは時間ベースで行われますが、機能開発に合
 
 すべての安定版リリースは、ゆるやかな互換性があります。ゆるやかな互換性とは:
 
-* マスターやエージェントはエコシステム・コンポーネント（スケジューラー、エクゼキュータ、ズーキーパー、サービス・ディスカバリー・レイヤー、モニタリングなど）が非推奨の機能（非推奨のフラグや非推奨のメトリクスなど）に依存していない限り、新しいリリース・バージョンにアップグレードすることができます。
+* マスターやエージェントはエコシステム・コンポーネント（スケジューラー、エクゼキュータ、Zookeeper、サービス・ディスカバリー・レイヤー、モニタリングなど）が非推奨の機能（非推奨のフラグや非推奨のメトリクスなど）に依存していない限り、新しいリリース・バージョンにアップグレードすることができます。
 * 非推奨ではない、外部から見える動作に予期せぬ影響があってはならない。Mesos APIに期待されることについては、API互換性のセクションを参照してください。
 
 > 注：互換性保証はまだモジュールには適用されません。詳しくは「モジュール」の項をご覧ください。
@@ -103,25 +103,25 @@ APIの互換性は、対応するプロトコルバッファの保証によっ�
 * 既存のCallの名称変更/削除する。
 
 
-## Implementation Details
+## 実装の詳細
 
-### Release branches
+### リリースブランチ
 
-For regular releases, the work is done on the master branch. There are no feature branches but there will be release branches.
+通常のリリースでは、作業は master ブランチで行われます。フィーチャーブランチはありませんが、リリースブランチはあります。
 
-When it is time to cut a minor release, a new branch (e.g., 1.2.x) is created off the master branch. We chose 'x' instead of patch release number to disambiguate branch names from tag names. Then the first RC (-rc1) is tagged on the release branch. Subsequent RCs, in case the previous RCs fail testing, should be tagged on the release branch.
+マイナーリリースが行われる時には、masterブランチから新しいブランチ（1.2.xなど）が作成されます。 ブランチ名とタグ名の曖昧さを避ける為、パッチのリリース番号を「x」にしています。 そして、最初のRC(-rc1)がリリースブランチにタグ付けされます。後続のRCは、前のRCがテストに失敗した場合に、リリースブランチにタグ付けされるべきです。
 
-Patch releases are also based off the release branches. Typically the fix for an issue that is affecting supported releases lands on the master branch and is then backported to the release branch(es). In rare cases, the fix might directly go into a release branch without landing on master (e.g.,  fix / issue is not applicable to master).
+パッチのリリースも、リリースブランチに基づいて行われます。 通常、サポート対象のリリースに影響を与える問題の修正は、masterブランチで行われ、その後、リリースブランチにバックポートされます。 稀に、修正プログラムがmasterに入らずに直接リリースブランチに入ることがあります。（例： fix/issueがmasterに適用されない）
 
-Having a branch for each minor release reduces the amount of work a release manager needs to do when it is time to do a release. It is the responsibility of the committer of a fix to commit it to all the affecting release branches. This is important because the committer has more context about the issue / fix at the time of the commit than a release manager at the time of release. The release manager of a minor release will be responsible for all its patch releases as well. Just like the master branch, history rewrites are not allowed in the release branch (i.e., no git push --force).
-
-
-### API protobufs
+マイナーリリースごとにブランチを用意することで、リリース時期にリリースマネージャーが行うべき作業量を減らすことができます。 修正プログラムのコミッターは、影響を与えるすべてのリリースブランチに修正プログラムをコミットする責任があります。 これは重要なことで、リリース時のリリースマネージャーよりも、コミット時のコミッターの方が、問題修正についてより多くの状況を把握しているからです。 マイナーリリースのリリースマネージャーは、そのマイナーリリースのすべてのパッチリリースにも責任を持ちます。 master ブランチと同様、release ブランチでも履歴の書き換えはできません。 (つまり、git push --force もできません)
 
 
-Most APIs in Mesos accept protobuf messages with a corresponding JSON field mapping. To support multiple versions of the API, we decoupled the versioned protobufs backing the API from the "internal" protobufs used by the Mesos code.
+### API プロトコルバッファ
 
-For example, the protobufs for the v1 Scheduler API are located at:
+
+MesosのほとんどのAPIは、対応するJSONフィールドマッピングを持つprotobufメッセージを受け取ります。 複数のAPIバージョンをサポートするために、APIをバックアップするバージョン管理されたprotobufを、Mesos内部のprotobufから切り離しました。
+
+例えば、v1 Scheduler APIのprotobufは以下の場所にあります。:
 
 ```
 include/mesos/v1/scheduler/scheduler.proto
@@ -132,7 +132,7 @@ option java_outer_classname = "Protos";
 ...
 ```
 
-The corresponding internal protobufs for the Scheduler API are located at:
+スケジューラーAPIに対応する内部プロトバフは以下の通りです。:
 
 ```
 include/mesos/scheduler/scheduler.proto
@@ -143,6 +143,6 @@ option java_outer_classname = "Protos";
 ...
 ```
 
-The users of the API send requests (and receive responses) based on the versioned protobufs. We implemented [evolve](https://github.com/apache/mesos/blob/master/src/internal/evolve.hpp)/[devolve](https://github.com/apache/mesos/blob/master/src/internal/devolve.hpp) converters that can convert protobufs from any supported version to the internal protobuf and vice versa.
+APIのユーザーは、バージョン管理されたプロトバフに基づいてリクエストを送信（レスポンスを受信）します。私たちは、[evolve](https://github.com/apache/mesos/blob/master/src/internal/evolve.hpp)/[devolve](https://github.com/apache/mesos/blob/master/src/internal/devolve.hpp) コンバーターを実装しました。このコンバーターは、サポートされている任意のバージョンのプロトバフを内部プロトバフに変換したり、その逆を行ったりすることができます。
 
-Internally, message passing between various Mesos components would use the internal unversioned protobufs. When sending response (if any) back to the user of the API, the unversioned protobuf would be converted back to a versioned protobuf.
+内部的には、さまざまなMesosコンポーネント間のメッセージ通信は、内部のバージョン管理されていないプロトバフを使用します。APIのユーザーにレスポンスを返す際には、バージョン管理されていないプロトバフがバージョン管理されたプロトバフに変換されます。

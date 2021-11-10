@@ -22,17 +22,17 @@ Mesosを入手する方法は様々です。:
 
 ## システム要件
 
-Mesos runs on Linux (64 Bit) and Mac OS X (64 Bit). To build Mesos from source, GCC 4.8.1+ or Clang 3.5+ is required.
+Mesosは、Linux（64ビット）およびMac OS X（64ビット）で動作します。Mesosをソースからビルドするには、GCC 4.8.1+またはClang 3.5+が必要です。
 
-On Linux, a kernel version >= 2.6.28 is required at both build time and run time. For full support of process isolation under Linux a recent kernel >= 3.10 is required.
+Linuxでは、ビルド時と実行時の両方で、カーネルバージョンが2.6.28以上であることが必要です。Linuxでプロセスの分離を完全にサポートするには、最新のカーネルが3.10以上必要です。
 
-The Mesos agent also runs on Windows. To build Mesos from source, follow the instructions in the [Windows](windows.md) section.
+また、MesosエージェントはWindowsでも動作します。ソースからMesosをビルドするには、[Windows](windows.md)のセクションの指示に従ってください。
 
-Make sure your hostname is resolvable via DNS or via `/etc/hosts` to allow full support of Docker's host-networking capabilities, needed for some of the Mesos tests. When in doubt, please validate that `/etc/hosts` contains your hostname.
+一部のMesosテストで必要となるDockerのホストネットワーク機能を完全にサポートするために、ホスト名がDNSまたは/etc/hostsで解決可能であることを確認してください。疑わしい場合は、/etc/hostsにあなたのホスト名が含まれていることを確認してください。
 
 ### Ubuntu 14.04
 
-Following are the instructions for stock Ubuntu 14.04. If you are using a different OS, please install the packages accordingly.
+以下は、純正のUbuntu 14.04での手順です。他のOSをお使いの方は、適宜パッケージをインストールしてください。
 
     # Update the packages.
     $ sudo apt-get update
@@ -51,7 +51,7 @@ Following are the instructions for stock Ubuntu 14.04. If you are using a differ
 
 ### Ubuntu 16.04
 
-Following are the instructions for stock Ubuntu 16.04. If you are using a different OS, please install the packages accordingly.
+以下は、純正のUbuntu 16.04での手順です。他のOSをお使いの方は、適宜パッケージをインストールしてください。
 
     # Update the packages.
     $ sudo apt-get update

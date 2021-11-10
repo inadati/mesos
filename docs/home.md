@@ -11,7 +11,7 @@ layout: documentation
 
 ## ビルド / インストール
 * [ビルド](building.md) Mesosのコンパイルとインストールの基本的な手順
-* [バイナリーパッケージ](binary-packages.md) Mesosのバイナリーパッケージの使用方法
+* [バイナリパッケージ](binary-packages.md) Mesosのバイナリーパッケージの使用方法
 * [設定](configuration.md) ビルド設定オプションを説明しています。
 * [CMake](cmake.md) 新しいCMakeシステムの仕様についての詳細
 * [Windowsサポート](windows.md) MesosでのWindowsサポートの状況

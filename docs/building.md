@@ -3,7 +3,7 @@ title: Apache Mesos - Building
 layout: documentation
 ---
 
-# 構築
+# ビルド
 
 ## Mesosのダウンロード
 

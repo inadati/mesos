@@ -3,24 +3,24 @@ title: Apache Mesos - Building
 layout: documentation
 ---
 
-# Building
+# ビルド
 
-## Downloading Mesos
+## Mesosのダウンロード
 
-There are different ways you can get Mesos:
+Mesosを入手する方法は様々です。:
 
-1\. Download the latest stable release from [Apache](http://mesos.apache.org/downloads/) (***Recommended***)
+1\. [Apache](http://mesos.apache.org/downloads/)から最新の安定版をダウンロード [Apache](http://mesos.apache.org/downloads/) (***推奨***)
 
     $ wget https://downloads.apache.org/mesos/1.11.0/mesos-1.11.0.tar.gz
     $ tar -zxf mesos-1.11.0.tar.gz
 
-2\. Clone the Mesos git [repository](https://gitbox.apache.org/repos/asf/mesos.git) (***Advanced Users Only***)
+2\. Mesosのgit[リポジトリ](https://gitbox.apache.org/repos/asf/mesos.git)をクローンする（***上級者向け***）
 
     $ git clone https://gitbox.apache.org/repos/asf/mesos.git
 
-*NOTE: If you have problems running the above commands, you may need to first run through the ***System Requirements*** section below to install the `wget`, `tar`, and `git` utilities for your system.*
+*注：上記のコマンドの実行に問題がある場合は、まず以下の**システム要件**のセクションを実行して、お使いのシステムに合ったwget、tar、gitの各ユーティリティをインストールする必要があるかもしれません。*
 
-## System Requirements
+## システム要件
 
 Mesos runs on Linux (64 Bit) and Mac OS X (64 Bit). To build Mesos from source, GCC 4.8.1+ or Clang 3.5+ is required.
 

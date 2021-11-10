@@ -3,11 +3,11 @@ title: Apache Mesos - Getting started using Binaries.
 layout: documentation
 ---
 
-# Binary Packages
+# バイナリパッケージ
 
-## Downloading the Mesos RPM
+## MesosのRPMをダウンロードする
 
-Download and install the latest stable RPM binary from the [Bintray Repository](https://bintray.com/apache/mesos/):
+[Bintrayリポジトリ](https://bintray.com/apache/mesos/)から最新の安定版RPMバイナリをダウンロードしてインストールします。:
 
     $ cat > /tmp/bintray-mesos-el.repo <<EOF
     #bintray-mesos-el - packages by mesos from Bintray
@@ -25,20 +25,18 @@ Download and install the latest stable RPM binary from the [Bintray Repository](
 
     $ sudo yum install mesos
 
-The above instructions show how to install the latest version of Mesos for RHEL 7.
-Substitute `baseurl` the with the appropriate URL for your operating system.
+上記の手順は、RHEL 7用の最新バージョンのMesosをインストールする方法を示しています。
+`baseurl` をお使いのオペレーティング・システムに適した URL に置き換えてください。
+## Mesosマスターとエージェントを起動する。
 
-## Start Mesos Master and Agent.
+RPMインストールでは、作業用ディレクトリとして使用できる`/var/lib/mesos`ディレクトリが作成されます。
 
-The RPM installation creates the directory `/var/lib/mesos` that can be used as a work directory.
-
-Start the Mesos master with the following command:
+以下のコマンドでMesosマスターを起動します。:
 
     $ mesos-master --work_dir=/var/lib/mesos
 
-On a different terminal, start the Mesos agent, and associate it with the Mesos master started above:
+別の端末でMesosエージェントを起動し、上記で起動したMesosマスターと関連付けます。:
 
     $ mesos-agent --work_dir=/var/lib/mesos --master=127.0.0.1:5050
 
-This is the simplest way to try out Mesos after downloading the RPM. For more complex and production
-setup instructions refer to the [Administration](http://mesos.apache.org/documentation/latest/#administration) section of the docs.
+この方法は、RPMをダウンロードした後にMesosを試す最も簡単な方法です。より複雑で本格的な設定方法については、ドキュメントの[管理](http://mesos.apache.org/documentation/latest/#administration)セクションを参照してください。

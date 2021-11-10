@@ -3,7 +3,7 @@ title: Apache Mesos - Building
 layout: documentation
 ---
 
-# ビルド
+# 構築
 
 ## Mesosのダウンロード
 
@@ -70,7 +70,7 @@ Linuxでは、ビルド時と実行時の両方で、カーネルバージョン
 
 ### Mac OS X 10.11 (El Capitan), macOS 10.12 (Sierra)
 
-Following are the instructions for Mac OS X El Capitan. When building Mesos with the Apple-provided toolchain, the Command Line Tools from XCode >= 8.0 are required; XCode 8 requires Mac OS X 10.11.5 or newer.
+以下は、Mac OS X El Capitanでの手順です。Appleが提供するツールチェーンを使用してMesosを構築する場合、XCode >= 8.0のコマンドラインツールが必要です。
 
     # Install Python 3: https://www.python.org/downloads/
 
@@ -90,7 +90,7 @@ Following are the instructions for Mac OS X El Capitan. When building Mesos with
     $ sudo easy_install pip
     $ pip install virtualenv
 
-When compiling on macOS 10.12, the following is needed:
+macOS 10.12でコンパイルする場合、以下が必要です。:
 
     # There is an incompatibility with the system installed svn and apr headers.
     # We need the svn and apr headers from a brew installation of subversion.
@@ -111,11 +111,11 @@ When compiling on macOS 10.12, the following is needed:
 
     # If so, turn on 'Remote Login' within System Preferences > Sharing to resolve the issue.
 
-*NOTE: When upgrading from Yosemite to El Capitan, make sure to rerun `xcode-select --install` after the upgrade.*
+*注：YosemiteからEl Capitanにアップグレードする場合は、アップグレード後に必ず`xcode-select --install`を再実行してください。*
 
 ### CentOS 6.6
 
-Following are the instructions for stock CentOS 6.6. If you are using a different OS, please install the packages accordingly.
+以下は、純正のCentOS 6.6を使用した場合の手順です。それ以外のOSをお使いの場合は、適宜パッケージをインストールしてください。
 
     # Install a recent kernel for full support of process isolation.
     $ sudo rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
@@ -177,7 +177,7 @@ Following are the instructions for stock CentOS 6.6. If you are using a differen
 
 ### CentOS 7.1
 
-Following are the instructions for stock CentOS 7.1. If you are using a different OS, please install the packages accordingly.
+以下は、純正のCentOS 7.1を使用した場合の手順です。それ以外のOSをお使いの場合は、適宜パッケージをインストールしてください。
 
     # Install a few utility tools
     $ sudo yum install -y tar wget git
@@ -217,9 +217,8 @@ Following are the instructions for stock CentOS 7.1. If you are using a differen
 
 ### Windows
 
-Follow the instructions in the [Windows](windows.md) section.
-
-## Building Mesos (Posix)
+[Windows](windows.md)の項の説明に従ってください。
+## Mesosの構築 (Posix)
 
     # Change working directory.
     $ cd mesos
@@ -233,7 +232,7 @@ Follow the instructions in the [Windows](windows.md) section.
     $ ../configure
     $ make
 
-In order to speed up the build and reduce verbosity of the logs, you can append `-j <number of cores> V=0` to `make`.
+ビルドを高速化し、ログの冗長性を減らすために、`-j <コア数> V=0` を `make` に追加することができます。
 
     # Run test suite.
     $ make check
@@ -241,11 +240,10 @@ In order to speed up the build and reduce verbosity of the logs, you can append 
     # Install (Optional).
     $ make install
 
-## Examples
+## 例
 
-Mesos comes bundled with example frameworks written in C++, Java and Python.
-The framework binaries will only be available after running `make check`, as
-described in the ***Building Mesos*** section above.
+Mesosには、C++、Java、Pythonで書かれたサンプルフレームワークがバンドルされています。
+フレームワークのバイナリは、上記の**Mesosの構築**のセクションで説明したように、`make check`を実行して初めて利用できるようになります。
 
     # Change into build directory.
     $ cd build
@@ -268,8 +266,6 @@ described in the ***Building Mesos*** section above.
     # Run Python framework (exits after successfully running some tasks).
     $ ./src/examples/python/test-framework 127.0.0.1:5050
 
-*Note: These examples assume you are running Mesos on your local machine.
-Following them will not allow you to access the Mesos web page in a production
-environment (e.g. on AWS). For that you will need to specify the actual IP of
-your host when launching the Mesos master and ensure your firewall settings
-allow access to port 5050 from the outside world.*
+*注：これらの例は、ローカルマシンでMesosを実行していることを前提としています。
+例に従うと、本番環境（AWSなど）でMesosのWebページにアクセスすることはできません。
+環境（例：AWS）ではアクセスできません。そのためには、Mesosマスターの起動時にホストの実際のIPを指定し、ファイアウォールの設定で外部からのポート5050へのアクセスを許可する必要があります。*

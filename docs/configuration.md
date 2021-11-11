@@ -3,56 +3,44 @@ title: Apache Mesos - Configuration
 layout: documentation
 ---
 
-# Mesos Runtime Configuration
+# Mesosランタイムの設定
 
-The Mesos master and agent can take a variety of configuration options
-through command-line arguments or environment variables. A list of the
-available options can be seen by running `mesos-master --help` or
-`mesos-agent --help`. Each option can be set in two ways:
+Mesosマスターとエージェントは、コマンドライン引数や環境変数でさまざまな設定オプションを取ることができます。利用可能なオプションの一覧は、`mesos-master -—help`または`mesos-agent -—help`を実行することで確認できます。各オプションは、次の2つの方法で設定できます。:
 
-* By passing it to the binary using `--option_name=value`, either
-specifying the value directly, or specifying a file in which the value
-resides (`--option_name=file://path/to/file`). The path can be
-absolute or relative to the current working directory.
+* `--option_name=value` を使って、値を直接指定するか、値が存在するファイルを指定して（`--option_name=file://path/to/file`）、バイナリに渡すことができます。パスは、現在の作業ディレクトリに対する絶対パスまたは相対パスです。
 
-* By setting the environment variable `MESOS_OPTION_NAME` (the option
-name with a `MESOS_` prefix added to it).
+* 環境変数`MESOS_OPTION_NAME`（オプション名に`MESOS_`の接頭辞を付けたもの）を設定する。
 
-Configuration values are searched for first in the environment, then
-on the command-line.
+設定値は、まず環境で検索され、次にコマンドラインで検索されます。
 
-Additionally, this documentation lists only a recent snapshot of the options in
-Mesos. A definitive source for which flags your version of Mesos supports can be
-found by running the binary with the flag `--help`, for example `mesos-master
---help`.
+このドキュメントでは、Mesosのオプションの最近のスナップショットのみを掲載しています。お使いのバージョンのMesosがどのフラグをサポートしているかについての正確な情報は、`mesos-master -—help`のように`-—help`フラグを付けてバイナリを実行することで確認できます。
 
-## Master and Agent Options
+## マスターとエージェントのオプション
 
-*These are options common to both the Mesos master and agent.*
+*これらは、Mesosマスターとエージェントの両方に共通するオプションです。*
 
 See [configuration/master-and-agent.md](configuration/master-and-agent.md).
 
-## Master Options
+## マスターのオプション
 
 See [configuration/master.md](configuration/master.md).
 
-## Agent Options
+## エージェントのオプション
 
 See [configuration/agent.md](configuration/agent.md).
 
-## Libprocess Options
+## Libprocessのオプション
 
 See [configuration/libprocess.md](configuration/libprocess.md).
 
-# Mesos Build Configuration
+# Mesosのビルド設定
 
-## Autotools Options
+## オートツールのオプション
 
-If you have special compilation requirements, please refer to `./configure
---help` when configuring Mesos.
+特別なコンパイル要件がある場合は、Mesosを設定する際に`./configure —help`を参照してください。
 
 See [configuration/autotools.md](configuration/autotools.md).
 
-## CMake Options
+## CMakeのオプション
 
 See [configuration/cmake.md](configuration/cmake.md).

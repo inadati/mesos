@@ -3,38 +3,32 @@ title: Apache Mesos - CMake
 layout: documentation
 ---
 
-# Install CMake 3.7+
+# CMake 3.7+のインストール
 
 [cmake-download]: https://cmake.org/download/
 
 ## Linux
 
-Install the latest version of CMake from [CMake.org][cmake-download].
-A self-extracting tarball is available to make this process painless.
+[CMake.org][cmake-download]から最新版のCMakeをインストールします。自己解凍型のタールボールが用意されているので、この作業は簡単です。
 
-Currently, few of the common Linux flavors package a sufficient CMake
-version. Ubuntu versions 12.04 and 14.04 package CMake 2;
-Ubuntu 16.04 packages CMake 3.5. If you already installed cmake from packages,
-you may remove it via: `apt-get purge cmake`.
+現在、一般的なLinuxでは、十分なバージョンのCMakeがパッケージされているものはほとんどありません。Ubuntu バージョン 12.04 および 14.04 は CMake 2 を、Ubuntu 16.04 は CMake 3.5 を搭載しています。パッケージからcmakeをインストールした場合は、`apt-get purge cmake`で削除できます。
 
-The standard CentOS package is CMake 2, and unfortunately even the `cmake3`
-package in EPEL is only CMake 3.6, you may remove them via:
-`yum remove cmake cmake3`.
+CentOSの標準パッケージはCMake 2ですが、残念ながらEPELの`cmake3`パッケージはCMake 3.6しかありませんので、次のようにして削除してください。  
+`yum remove cmake cmake3`
 
 ## Mac OS X
 
-HomeBrew's CMake version is sufficient: `brew install cmake`.
+HomeBrewのCMakeのバージョンで十分です。： `brew install cmake`
 
 ## Windows
 
-Download and install the MSI from [CMake.org][cmake-download].
+[CMake.org][cmake-download]からMSIをダウンロードしてインストールします。
 
-**NOTE:** Windows needs CMake 3.8+, rather than 3.7+.
+**注:** Windowsでは、CMake 3.7+ではなく、3.8+が必要です。
 
 # Quick Start
 
-The most basic way to build with CMake, with no configuration, is fairly
-straightforward:
+CMakeを使って設定なしでビルドする最も基本的な方法は、非常に簡単です。:
 
 ```
 mkdir build
@@ -43,44 +37,33 @@ cmake ..
 cmake --build .
 ```
 
-The last step, `cmake --build .` can also take a `--target` command to build any
-particular target (e.g. `mesos-tests`, or `tests` to build `mesos-tests`,
-`libprocess-tests`, and `stout-tests`): `cmake --build . --target tests`. To
-send arbitrary flags to the native build system underneath (e.g. `make`), append
-the command with `-- <flags to be passed>`: `cmake --build . -- -j4`.
+最後のステップである `cmake --build .` は、任意の特定のターゲットをビルドする `--target` コマンドを取ることもできます。 (例: `mesos-tests`、または `tests`で`mesos-tests`、`libprocess-tests`、`stout-tests`をビルドする)  `cmake --build . --target tests` 任意のフラグをネイティブのビルドシステム (`make` など) に送るには，コマンドに `-- <flags to be passed>` を追加します。`cmake --build . -- -j4`
 
-Also, `cmake --build` can be substituted by your build system of choice. For
-instance, the default CMake generator on Linux produces GNU Makefiles, so after
-configuring with `cmake ..`, you can just run `make tests` in the `build` folder
-like usual. Similarly, if you configure with `-G Ninja` to use the Ninja
-generator, you can then run `ninja tests` to build the `tests` target with
-Ninja.
+また、`cmake --build` の代わりに、お好みのビルドシステムを使用することができます。例えば、Linux のデフォルトの CMake ジェネレーターは GNU Makefile を生成するので、`cmake ..` を設定した後は、通常通り `build` フォルダで `make tests` を実行すればよいのです。同様に、`-G Ninja` で設定して Ninja ジェネレーターを使用すると、`ninja tests` を実行して Ninja で`tests`をビルドすることができます。
 
-# Installable build
+# インストール可能なビルド
 
-This example will build Mesos and install it into a custom prefix:
+この例では、Mesosをビルドし、カスタムプレフィックスにインストールします。:
 ```
 mkdir build && cd build
 cmake -DCMAKE_INSTALL_PREFIX=/home/current_user/mesos
 cmake --build . --target install
 ```
 
-To additionally install `mesos-tests` executable and related test helpers
-(this can be used to run Mesos tests against the installed binaries),
-one can enable the `MESOS_INSTALL_TESTS` option.
+`mesos-tests`実行ファイルと関連するテストヘルパーを追加でインストールするには、`MESOS_INSTALL_TESTS`オプションを有効にします。（これは、インストールしたバイナリに対してMesosテストを実行するために使用できます）
 
-To produce a set of binaries and libraries that will work after being
-copied/moved to a different location, use `MESOS_FINAL_PREFIX`.
+別の場所にコピー/移動した後も動作するバイナリやライブラリのセットを作成するには、`MESOS_FINAL_PREFIX`を使用します。
 
-The example below employs both `MESOS_FINAL_PREFIX` and `MESOS_INSTALL_TESTS`.
-On a build system:
+以下の例では、`MESOS_FINAL_PREFIX`と`MESOS_INSTALL_TESTS`の両方を使用しています。
+
+ビルドシステムで:
 ```
 mkdir build && cd build
 cmake -DMESOS_FINAL_PREFIX=/opt/mesos -DCMAKE_INSTALL_PREFIX=/home/current_user/mesos -DMESOS_INSTALL_TESTS=ON
 cmake --build . --target install
 tar -czf mesos.tar.gz mesos -C /home/current_user
 ```
-On a target system:
+ターゲットシステムで:
 ```
 sudo tar -xf mesos.tar.gz -C /opt
 # Run tests against Mesos installation
@@ -89,45 +72,33 @@ sudo /opt/mesos/bin/mesos-tests
 sudo /opt/mesos/bin/mesos-agent --work-dir=/var/lib/mesos ...
 ```
 
-# Supported options
+# 対応オプション
 
-See [configuration options](configuration/cmake.md).
+See [設定オプション](configuration/cmake.md).
 
-# Examples
+# 例
 
-See [CMake By Example](cmake-examples.md).
+See [CMakeの例](cmake-examples.md).
 
-# Documentation
+# ドキュメント
 
-The [CMake documentation][] is written as a reference module. The most commonly
-used sections are:
+[CMakeのドキュメント][]は、リファレンスモジュールとして書かれています。最もよく使われるセクションは:
 
-* [buildsystem overview](https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html)
-* [commands](https://cmake.org/cmake/help/latest/manual/cmake-commands.7.html)
-* [properties](https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html)
-* [variables](https://cmake.org/cmake/help/latest/manual/cmake-variables.7.html)
+* [ビルドシステムの概要](https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html)
+* [コマンド](https://cmake.org/cmake/help/latest/manual/cmake-commands.7.html)
+* [プロパティ](https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html)
+* [変数](https://cmake.org/cmake/help/latest/manual/cmake-variables.7.html)
 
-The wiki also has a set of [useful variables][].
+また、wikiには[便利な変数][]のセットがあります。
 
-[CMake documentation]: https://cmake.org/cmake/help/latest/
-[useful variables]: https://cmake.org/Wiki/CMake_Useful_Variables
+[CMakeのドキュメント]: https://cmake.org/cmake/help/latest/
+[便利な変数]: https://cmake.org/Wiki/CMake_Useful_Variables
 
-# Dependency graph
+# 依存関係のグラフ
 
-Like any build system, CMake has a dependency graph. The difference is
-that targets in CMake's dependency graph are _much richer_ compared to other
-build systems. CMake targets have the notion of 'interfaces', where build
-properties are saved as part of the target, and these properties can be
-inherited transitively within the graph.
+他のビルドシステムと同様に、CMakeは依存関係のグラフを持っています。他のビルドシステムとの違いは、CMakeの依存関係グラフのターゲットが他のビルドシステムに比べて非常に豊富であることです。CMake のターゲットは 「インターフェイス」 という概念を持っており、ビルドプロパティがターゲットの一部として保存され、これらのプロパティはグラフ内で過渡的に継承されます。
 
-For example, say there is a library `mylib`, and anything which links it must
-include its headers, located in `mylib/include`. When building the library, some
-private headers must also be included, but not when linking to it. When
-compiling the executable `myprogram`, `mylib`'s public headers must be included,
-but not its private headers. There is no manual step to add `mylib/include` to
-`myprogram` (and any other program which links to `mylib`), it is instead
-deduced from the public interface property of `mylib`. This is represented by
-the following code:
+例えば、`mylib`というライブラリがあり、それをリンクする際には、`mylib/include`にあるそのヘッダをインクルードしなければなりません。ライブラリをビルドする際には、いくつかのプライベートヘッダもインクルードする必要がありますが、リンクする際にはインクルードしません。実行ファイルである`myprogram`をコンパイルする際には、`mylib`のパブリックヘッダをインクルードする必要がありますが、プライベートヘッダはインクルードしません。`myprogram`（および`mylib`にリンクする他のプログラム）に`mylib/include`を追加する手動のステップはなく、代わりに`mylib`のpublic interfaceプロパティから推論されます。これは以下のコードで表されます。:
 
 ```
 # A new library with a single source file (headers are found automatically).
@@ -148,22 +119,11 @@ target_link_libraries(myprogram mylib)
 # There is no additional step to add `mylib/include` to `myprogram`.
 ```
 
-This same notion applies to practically every build property:
-compile definitions via [`target_compile_definitions`][],
-include directories via [`target_include_directories`][],
-link libraries via [`target_link_libraries`][],
-compile options via [`target_compile_options`][],
-and compile features via [`target_compile_features`][].
+この考え方は、[`target_compile_definitions`][]のコンパイル定義、[`target_include_directories`][]のインクルードディレクトリ、[`target_link_libraries`][]のリンクライブラリ、[`target_compile_options`][]のコンパイルオプション、[`target_compile_features`][]のコンパイル機能など、ほぼすべてのビルドプロパティに当てはまります。
 
-All of these commands also take an optional argument of
-`<INTERFACE|PUBLIC|PRIVATE>`, which constrains their transitivity in the graph.
-That is, a `PRIVATE` include directory is recorded for the target, but not
-shared transitively to anything depending on the target, `PUBLIC` is used
-for both the target and dependencies on it, and `INTERFACE` is used only
-for dependencies.
+これらのコマンドはすべて、オプションで`<INTERFACE|PUBLIC|PRIVATE>`という引数を取り、グラフ内での遷移性を制約します。すなわち、`PRIVATE`インクルード・ディレクトリはターゲットのために記録されますが、ターゲットに依存するものには経時的に共有されません。`PUBLIC`はターゲットとその依存関係の両方に使用され、`INTERFACE`は依存関係にのみ使用されます。
 
-Notably missing from this list are link directories. CMake explicitly prefers
-finding and using the absolute paths to libraries, obsoleting link directories.
+このリストで注目すべきは、リンクディレクトリがないことです。CMake はライブラリの絶対パスを見つけて使用することを明確に推奨しており、リンクディレクトリは廃止されました。
 
 [`target_compile_definitions`]: https://cmake.org/cmake/help/latest/command/target_compile_definitions.html
 [`target_include_directories`]: https://cmake.org/cmake/help/latest/command/target_include_directories.html
@@ -171,43 +131,28 @@ finding and using the absolute paths to libraries, obsoleting link directories.
 [`target_compile_options`]: https://cmake.org/cmake/help/latest/command/target_compile_options.html
 [`target_compile_features`]: https://cmake.org/cmake/help/latest/command/target_compile_features.html
 
-# Common mistakes
+# よくある間違い
 
-## Booleans
+## Boolean
 
-CMake treats `ON`, `OFF`, `TRUE`, `FALSE`, `1`, and `0` all as true/false
-booleans. Furthermore, variables of the form `<target>-NOTFOUND` are also
-treated as false (this is used for finding packages).
+CMakeでは、`ON`、`OFF`、`TRUE`、`FALSE`、`1`、`0`をすべて真偽不明のBooleanとして扱います。さらに、`<target>-NOTFOUND`という形式の変数もfalseとして扱われます（これはパッケージの検索に使用されます）。
 
-In Mesos, we prefer the boolean types `TRUE` and `FALSE`.
+Mesosでは、`TRUE`と`FALSE`というBoolean型が好まれます。
 
-See [`if`](https://cmake.org/cmake/help/latest/command/if.html) for more info.
+詳しくは [`if`](https://cmake.org/cmake/help/latest/command/if.html) を参照してください。
 
-## Conditionals
+## 条件式
 
-For historical reasons, CMake conditionals such as `if` and `elseif`
-automatically interpolate variable names. It is therefore dangerous to
-interpolate them manually, because if `${FOO}` evaluates to `BAR`, and `BAR` is
-another variable name, then `if (${FOO})` becomes `if (BAR)`, and `BAR` is then
-evaluated again by the `if`. Stick to `if (FOO)` to check the value of `${FOO}`.
-Do not use `if (${FOO})`.
+歴史的な理由により、CMakeの`if`や`elseif`などの条件式は、自動的に変数名を補間します。もし、`${FOO}`が`BAR`と評価され、`BAR`が別の変数名であれば、`if (${FOO})`は`if (BAR)`となり、`BAR`は`if`によって再び評価されることになるため、手動で補間することは危険です。`${FOO}`の値を確認するには、`if (FOO)`にこだわってください。`if (${FOO})`は使用しないでください。
 
-Also see the CMake policies
-[CMP0012](https://cmake.org/cmake/help/latest/policy/CMP0012.html) and
-[CMP0054](https://cmake.org/cmake/help/latest/policy/CMP0054.html).
+CMake ポリシー [CMP0012](https://cmake.org/cmake/help/latest/policy/CMP0012.html) および [CMP0054](https://cmake.org/cmake/help/latest/policy/CMP0054.html) も参照してください。
 
-## Definitions
+## 定義
 
-When using `add_definitions()` (which should be used rarely, as it is for
-"global" compile definitions), the flags must be prefixed with `-D` to be
-treated as preprocessor definitions. However, when using
-`target_compile_definitions()` (which should be preferred, as it is
-for specific targets), the flags do not need the prefix.
+`add_definitions()`を使用する場合（「グローバル」なコンパイル定義のためなので、めったに使用すべきではありません）、プリプロセッサ定義として扱われるためには、フラグの前に`-D`を付けなければなりません。しかし、`target_compile_definitions()`を使用する場合（特定のターゲットのために使用するため、好んで使用されるべきです）、フラグにはプレフィックスが必要ありません。
+# 様式
 
-# Style
-
-In general, wrap at 80 lines, and use a two-space indent. When wrapping
-arguments, put the command on a separate line and arguments on subsequent lines:
+一般的には、80行で折り返し、2スペースのインデントを使用します。引数を折り返す場合は、コマンドを別の行に、引数をそれ以降の行に書きます。:
 
 ```
 target_link_libraries(
@@ -217,54 +162,38 @@ target_link_libraries(
   gamma)
 ```
 
-Otherwise keep it together:
+もしくは、一行で記述できます。:
 
 ```
 target_link_libraries(program PUBLIC library)
 ```
 
-Always keep the trailing parenthesis with the last argument.
+括弧は常に最後の引数と一緒にしてください。
 
-Use a single space between conditionals and their open parenthesis, e.g.
-`if (FOO)`, but not for commands, e.g. `add_executable(program)`.
+`if (FOO)`のような条件式とカッコの間には半角スペースを使用しますが、`add_executable(program)`のようなコマンドには使用しません。
 
-CAPITALIZE the declaration and use of custom functions and macros (e.g.
-`EXTERNAL` and `PATCH_CMD`), and do not capitalize the use of CMake built-in
-(including modules) functions and macros. CAPITALIZE variables.
+カスタム関数やマクロ（`EXTERNAL`や`PATCH_CMD`など）の宣言と使用は大文字で行い、CMakeの組み込み（モジュールを含む）関数やマクロの使用は大文字で行いません。変数を大文字にします。
 
-# CMake anti-patterns
+# CMakeのアンチパターン
 
-[anti-patterns]: http://voices.canonical.com/jussi.pakkanen/2013/03/26/a-list-of-common-cmake-antipatterns/
+[アンチパターン]: http://voices.canonical.com/jussi.pakkanen/2013/03/26/a-list-of-common-cmake-antipatterns/
 
-Because CMake handles much more of the grunt work for you than other build
-systems, there are unfortunately a lot of CMake [anti-patterns][] you should
-look out for when writing new CMake code. These are some common problems
-that should be avoided when writing new CMake code:
+CMake は他のビルドシステムよりも多くの 単純作業を代行するため、残念ながら新しい CMake コードを書く際に気をつけなければならない CMake の[アンチパターン][]がたくさんあります。以下は、新しい CMake コードを書く際に避けなければならない一般的な問題です。:
 
-## Superfluous use of `add_dependencies`
+## `add_dependencies`の余分な使用
 
-When you've linked library `a` to library `b` with `target_link_libraries(a b)`,
-the CMake graph is already updated with the dependency information. It is
-redundant to use `add_dependencies(a b)` to (re)specify the dependency. In fact,
-this command should _rarely_ be used.
+`target_link_libraries(a b)`でライブラリ`a`をライブラリ`b`にリンクした場合、CMakeのグラフはすでに依存関係の情報で更新されています。依存関係を(再)指定するために `add_dependencies(a b)` を使うのは冗長です。実際のところ、このコマンドはほとんど使われるべきではありません。
 
-The exceptions to this are:
+その例外として:
 
-  1. Setting a dependency from an imported library to a target added via
-     `ExternalProject_Add`.
-  2. Setting a dependency on Mesos modules since no explicit linking is done.
-  3. Setting a dependency between executables (e.g. the `mesos-agent` requiring the
-     `mesos-containerizer` executable). In general, runtime dependencies need
-     to be setup with `add_dependency`, but never link dependencies.
+  1. `ExternalProject_Add`で追加されたターゲットに、インポートされたライブラリからの依存関係を設定する。
+  2. 明示的なリンクが行われないため、Mesosモジュールへの依存関係を設定する。
+  3. 実行ファイル間の依存関係を設定する（例：`mesos-agent`が`mesos-containerizer`実行ファイルを必要とする）。一般的に、実行時の依存関係は`add_dependency`で設定する必要がありますが、リンク依存関係は設定しません。
 
-## Use of `link_libraries` or `link_directories`
+## `link_libraries`または `link_directories`の使用
 
-Neither of these commands should ever be used. The only appropriate command used
-to link libraries is [`target_link_libraries`][], which records the information
-in the CMake dependency graph. Furthermore, imported third-party libraries
-should have correct locations recorded in their respective targets, so the use
-of `link_directories` should never be necessary. The
-[official documentation][link-directories] states:
+これらのコマンドは決して使用してはいけません。ライブラリのリンクに使用される唯一の適切なコマンドは [`target_link_libraries`][] であり、CMake の依存関係グラフに情報を記録します。さらに、インポートされたサードパーティのライブラリは、それぞれのターゲットに正しい位置が記録されているはずなので、`link_directories`の使用は決して必要ではありません。
+[公式ドキュメント][link-directories]では:
 
 > Note that this command is rarely necessary. Library locations returned by
 > `find_package()` and `find_library()` are absolute paths. Pass these absolute
@@ -273,53 +202,30 @@ of `link_directories` should never be necessary. The
 
 [link-directories]: https://cmake.org/cmake/help/latest/command/link_directories.html
 
-The difference is that the former sets global (or directory level) side effects,
-and the latter sets specific target information stored in the graph.
+前者はグローバルな（またはディレクトリレベルの）副作用を設定し、後者はグラフに格納された特定のターゲット情報を設定するという違いがあります。
 
-## Use of `include_directories`
+## `include_directories`の使用
 
-This is similar to the above: the [`target_include_directories`][] should always
-be preferred so that the include directory information remains localized to the
-appropriate targets.
+インクルードディレクトリの情報が適切なターゲットにローカライズされたままになるように、`target_include_directories`を常に優先すべきであるということです。
+## `endif ()`に何かを追加する
 
-## Adding anything to `endif ()`
+CMake の古いバージョンでは、`if (FOO)` ... `endif (FOO)` というスタイルを想定しており、`endif` に `if` コマンドと同じ式が含まれていました。しかし、これでは冗長になってしまうので、`endif ()`の括弧は空にしておきましょう。これは、`endforeach()`、`endwhile()`、`endmacro()`、`endfunction()`などの他の終わり方にも当てはまります。
 
-Old versions of CMake expected the style `if (FOO) ... endif (FOO)`, where the
-`endif` contained the same expression as the `if` command. However, this is
-tortuously redundant, so leave the parentheses in `endif ()` empty. This goes
-for other endings too, such as `endforeach ()`, `endwhile ()`, `endmacro ()` and
-`endfunction ()`.
+## 余分なヘッダーファイルの指定
 
-## Specifying header files superfluously
+CおよびC++プロジェクトでCMakeを使用する際の明確な利点の1つは、ターゲットのソースリストにヘッダーファイルを追加する必要がないことです。CMakeは、ソースファイル（`.c`、`.cpp`など）を解析し、必要なヘッダーを自動的に決定するように設計されています。ただし、ビルドの一部として生成されたヘッダー（protobufやJNIヘッダーなど）は例外です。
 
-One of the distinct advantages of using CMake for C and C++ projects is that
-adding header files to the source list for a target is unnecessary. CMake is
-designed to parse the source files (`.c`, `.cpp`, etc.) and determine their
-required headers automatically. The exception to this is headers generated as
-part of the build (such as protobuf or the JNI headers).
+## `CMAKE_BUILD_TYPE`を確認する
 
-## Checking `CMAKE_BUILD_TYPE`
+詳細については、[デバッグまたはリリース構成の構築](cmake-examples.md#building-debug-or-release-configurations)の例を参照してください。要するに、全ての[ジェネレーターが設定時][]に変数 `CMAKE_BUILD_TYPE` を尊重するわけではないので、CMake ロジックで使用してはいけません。サポートされている場合は、`$<$<CONFIG:Debug>:DEBUG_MODE>`のようなジェネレータ式を使用することができます。
 
-See the ["Building debug or release configurations"](cmake-examples.md#building-debug-or-release-configurations)
-example for more information. In short, not all generators respect the variable
-`CMAKE_BUILD_TYPE` at configuration time, and thus it must not be used in CMake
-logic. A usable alternative (where supported) is a [generator expression][] such
-as `$<$<CONFIG:Debug>:DEBUG_MODE>`.
+[ジェネレーターが設定時]: https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#logical-expressions
 
-[generator expression]: https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#logical-expressions
-
-# Remaining hacks
+# その他のHack
 
 ## `3RDPARTY_DEPENDENCIES`
 
-Until Mesos on Windows is stable, we keep some dependencies in an external
-repository, [3rdparty](https://github.com/mesos/3rdparty). When
-all dependencies are bundled with Mesos, this extra repository will no longer be
-necessary. Until then, the CMake variable `3RDPARTY_DEPENDENCIES` points by
-default to this URL, but it can also point to the on-disk location of a local
-clone of the repo. With this option you can avoid pulling from GitHub for every
-clean build. Note that this must be an absolute path with forward slashes, e.g.
-`-D3RDPARTY_DEPENDENCIES=C:/3rdparty`, otherwise it will fail on Windows.
+Mesos on Windowsが安定するまでは、いくつかの依存関係を外部のリポジトリ[3rdparty](https://github.com/mesos/3rdparty)に保管しています。すべての依存関係がMesosにバンドルされるようになれば、この追加リポジトリは必要なくなります。それまでは、CMakeの変数`3RDPARTY_DEPENDENCIES`はデフォルトでこのURLを指しますが、レポのローカルクローンのディスク上の場所を指すこともできます。このオプションを使用すると、クリーンビルドのたびに GitHub からデータを取得する必要がなくなります。`-D3RDPARTY_DEPENDENCIES=C:/3rdparty`のように、フォワードスラッシュを含む絶対パスでなければならないことに注意してください。（Windowsでは失敗します）
 
 ## `EXTERNAL`
 

@@ -3,15 +3,15 @@ title: Apache Mesos - High-Availability Mode
 layout: documentation
 ---
 
-# Mesos High-Availability Mode
+# Mesosの高可用モード
 
-If the Mesos master is unavailable, existing tasks can continue to execute, but new resources cannot be allocated and new tasks cannot be launched. To reduce the chance of this situation occurring, Mesos has a high-availability mode that uses multiple Mesos masters: one active master (called the _leader_ or leading master) and several _backups_ in case it fails. The masters elect the leader, with [Apache ZooKeeper](http://zookeeper.apache.org/) both coordinating the election and handling leader detection by masters, agents, and scheduler drivers. More information regarding [how leader election works](https://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection) is available on the Apache Zookeeper website.
+Mesosマスターが利用できない場合、既存のタスクは継続して実行できますが、新しいリソースの割り当てや新しいタスクの起動はできません。このような事態が発生する可能性を減らすために、Mesosには複数のMesosマスターを使用する高可用モードがあります。各マスターはリーダーを選出し、[Apache ZooKeeper](http://zookeeper.apache.org/)がその調整と、マスター、エージェント、スケジューラドライバによるリーダーの検出を行います。[リーダー選挙の仕組み](https://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection)については、Apache ZookeeperのWebサイトを参照してください。
 
-This document describes how to configure Mesos to run in high-availability mode. For more information on developing highly available frameworks, see a [companion document](high-availability-framework-guide.md).
+このドキュメントでは、Mesosが高可用モードで動作するように設定する方法を説明します。高可用性フレームワークの開発に関する詳細は、[関連文書](high-availability-framework-guide.md)を参照してください。
 
-**Note**: This document assumes you know how to start, run, and work with ZooKeeper, whose client library is included in the standard Mesos build.
+**注**: 本ドキュメントは、Mesosの標準ビルドに含まれるクライアント・ライブラリであるZooKeeperの起動、実行、および操作方法を知っていることを前提としています。
 
-## Usage
+## 使用方法
 To put Mesos into high-availability mode:
 
 1. Ensure that the ZooKeeper cluster is up and running.

@@ -229,70 +229,43 @@ Mesos on Windowsが安定するまでは、いくつかの依存関係を外部�
 
 ## `EXTERNAL`
 
-The CMake function `EXTERNAL` defines a few variables that make it easy for us
-to track the directory structure of a dependency. In particular, if our
-library's name is `boost`, we invoke:
+CMakeの`EXTERNAL`関数では、依存関係にあるディレクトリ構造を簡単に追跡するための変数がいくつか定義されています。具体的には、ライブラリの名前が`boost`の場合、次のように呼び出します。:
 
 ```
 EXTERNAL(boost ${BOOST_VERSION} ${CMAKE_CURRENT_BINARY_DIR})
 ```
 
-Which will define the following variables as side-effects in the current scope:
+これにより、現在のスコープで以下の変数が副作用として定義されます。:
 
-* `BOOST_TARGET`     (a target folder name to put dep in e.g., `boost-1.53.0`)
-* `BOOST_CMAKE_ROOT` (where to have CMake put the uncompressed source, e.g.,
-                     `build/3rdparty/boost-1.53.0`)
-* `BOOST_ROOT`       (where the code goes in various stages of build, e.g.,
-                     `build/.../boost-1.53.0/src`, which might contain folders
-                     `build-1.53.0-build`, `-lib`, and so on, for each build
-                     step that dependency has)
+* `BOOST_TARGET` (depを入れるターゲットフォルダ名。例：`boost-1.53.0`)
+* `BOOST_CMAKE_ROOT` (CMakeが圧縮されていないソースを置く場所。例：`build/3rdparty/boost-1.53.0`)
+* `BOOST_ROOT` (ビルドの様々な段階でコードが置かれる場所。例えば、`build/.../boost-1.53.0/src`のように、依存関係にあるビルドの段階ごとに、`build-1.53.0-build`、`-lib`などのフォルダが含まれることがあります)
 
-The implementation is in `3rdparty/cmake/External.cmake`.
+実装は`3rdparty/cmake/External.cmake`にあります。
 
-This is not to be confused with the CMake module [ExternalProject][], from which
-we use `ExternalProject_Add` to download, extract, configure, and build our
-dependencies.
+これは、CMakeのモジュールである[ExternalProject][]と混同してはいけません。`ExternalProject_Add`を使用して、依存関係のダウンロード、抽出、設定、およびビルドを行います。
 
 [ExternalProject]: https://cmake.org/cmake/help/latest/module/ExternalProject.html
 
 ## `CMAKE_NOOP`
 
-This is a CMake variable we define in `3rdparty/CMakeLists.txt` so that we can
-cancel steps of `ExternalProject`. `ExternalProject`'s default behavior is to
-attempt to configure, build, and install a project using CMake. So when one of
-these steps must be skipped, we use set it to `CMAKE_NOOP` so that nothing
-is run instead.
+これは、`3rdparty/CMakeLists.txt`で定義するCMake変数で、`ExternalProject`のステップをキャンセルできるようにします。`ExternalProject`のデフォルトの動作は、CMakeを使用してプロジェクトの設定、ビルド、インストールを試みることです。そのため、これらのステップの1つをスキップしなければならない場合、`CMAKE_NOOP`に設定して、代わりに何も実行されないようにします。
 
 ## `CMAKE_FORWARD_ARGS`
 
-The `CMAKE_FORWARD_ARGS` variable defined in `3rdparty/CMakeLists.txt` is sent
-as the `CMAKE_ARGS` argument to the `ExternalProject_Add` macro (along with any
-per-project arguments), and is used when the external project is configured as a
-CMake project. If either the `CONFIGURE_COMMAND` or `BUILD_COMMAND` arguments of
-`ExternalProject_Add` are used, then the `CMAKE_ARGS` argument will be ignored.
-This variable ensures that compilation configurations are properly propagated to
-third-party dependencies, such as compiler flags.
+`3rdparty/CMakeLists.txt`に定義されている`CMAKE_FORWARD_ARGS`変数は、`CMAKE_ARGS`引数として`ExternalProject_Add`マクロに送られ（プロジェクトごとの引数も一緒に）、外部プロジェクトがCMakeプロジェクトとして設定されたときに使用されます。`ExternalProject_Add`の`CONFIGURE_COMMAND`または`BUILD_COMMAND`引数のいずれかが使用される場合、`CMAKE_ARGS`引数は無視されます。この変数は、コンパイラフラグなどのコンパイル構成がサードパーティの依存関係に適切に伝搬されることを保証します。
 
 ### `CMAKE_SSL_FORWARD_ARGS`
 
-The `CMAKE_SSL_FORWARD_ARGS` variable defined in `3rdparty/CMakeLists.txt`
-is like `CMAKE_FORWARD_ARGS`, but only used for specific external projects
-that find and link against OpenSSL.
+`3rdparty/CMakeLists.txt`で定義されている`CMAKE_SSL_FORWARD_ARGS`変数は、`CMAKE_FORWARD_ARGS`と似ていますが、OpenSSLを見つけてリンクする特定の外部プロジェクトにのみ使用されます。
 
 ## `LIBRARY_LINKAGE`
 
-This variable is a shortcut used in `3rdparty/CMakeLists.txt`. It is set to
-`SHARED` when `BUILD_SHARED_LIBS` is true, and otherwise it is set to `STATIC`.
-The `SHARED` and `STATIC` keywords are used to declare how a library should be
-built; however, if left out then the type is deduced automatically from
-`BUILD_SHARED_LIBS`.
+この変数は、`3rdparty/CMakeLists.txt`で使われるショートカットです。`BUILD_SHARED_LIBS`がtrueの場合は`SHARED`に、それ以外の場合は`STATIC`に設定されます。`SHARED`キーワードと`STATIC`キーワードは、ライブラリをどのように構築するかを宣言するために使用されますが、省略された場合は`BUILD_SHARED_LIBS`から自動的にタイプが推測されます。
 
 ## `MAKE_INCLUDE_DIR`
 
-This function works around a [CMake issue][cmake-15052] with setting include
-directories of imported libraries built with `ExternalProject_Add`. We have to
-call this for each `IMPORTED` third-party dependency which has set
-`INTERFACE_INCLUDE_DIRECTORIES`, just to make CMake happy. An example is Glog:
+この関数は、`ExternalProject_Add`でビルドされたインポートライブラリのインクルードディレクトリの設定に関する[CMakeの問題][cmake-15052]を回避します。CMakeを快適に利用するために、`INTERFACE_INCLUDE_DIRECTORIES`を設定している各`IMPORTED`サードパーティ依存関係に対して、これを呼び出さなければなりません。例として、Glog:
 
 ```
 MAKE_INCLUDE_DIR(glog)
@@ -302,26 +275,20 @@ MAKE_INCLUDE_DIR(glog)
 
 ## `GET_BYPRODUCTS`
 
-This function works around a [CMake issue][cmake-060234] with the Ninja
-generator where it does not understand imported libraries, and instead needs
-`BUILD_BYPRODUCTS` explicitly set. This simply allows us to use
-`ExternalProject_Add` and Ninja. For Glog, it looks like this:
+この関数は、Ninjaジェネレーターがインポートされたライブラリを理解せず、代わりに`BUILD_BYPRODUCTS`を明示的に設定する必要があるという[CMakeの問題][cmake-060234]を回避します。これにより、単純に`ExternalProject_Add`とNinjaを使うことができます。Glogでは以下のようになります。:
 
 ```
 GET_BYPRODUCTS(glog)
 ```
 
-Also see the CMake policy [CMP0058][].
+また、CMakeポリシー [CMP0058][]も参照してください。
 
 [cmake-060234]: https://cmake.org/pipermail/cmake/2015-April/060234.html
 [CMP0058]: https://cmake.org/cmake/help/latest/policy/CMP0058.html
 
 ## `PATCH_CMD`
 
-The CMake function `PATCH_CMD` generates a patch command given a patch file.
-If the path is not absolute, it's resolved to the current source directory.
-It stores the command in the variable name supplied. This is used to easily
-patch third-party dependencies. For Glog, it looks like this:
+CMakeの関数`PATCH_CMD`は、パッチファイルを与えられてパッチコマンドを生成します。パスが絶対パスでない場合は、現在のソースディレクトリに解決されます。コマンドは指定された変数名に格納されます。これは、サードパーティの依存関係に簡単にパッチを当てるために使われます。Glogの場合は以下のようになります。:
 
 ```
 PATCH_CMD(GLOG_PATCH_CMD glog-${GLOG_VERSION}.patch)
@@ -331,23 +298,18 @@ ExternalProject_Add(
   PATCH_COMMAND     ${GLOG_PATCH_CMD})
 ```
 
-The implementation is in `3rdparty/cmake/PatchCommand.cmake`.
+実装は`3rdparty/cmake/PatchCommand.cmake`にあります。
 
 ### Windows `patch.exe`
 
-While using `patch` on Linux is straightforward, doing the same on Windows takes
-a bit of work. `PATH_CMD` encapsulates this:
+Linuxでの`patch`の使用は簡単ですが、Windowsで同じことをするには少し手間がかかります。`PATH_CMD` は以下をカプセル化します。:
 
-* Checks the cache variable `PATCHEXE_PATH` for `patch.exe`.
-* Searches for `patch.exe` in its default locations.
-* Copies `patch.exe` and a custom manifest to the temporary directory.
-* Applies the manifest to avoid the UAC prompt.
-* Uses the patched `patch.exe`.
+* `patch.exe` のキャッシュ変数 `PATCHEXE_PATH` をチェックします。
+* 既定の場所にある`patch.exe`を検索します。
+* `patch.exe`とカスタムマニフェストを一時ディレクトリにコピーします。
+* UACプロンプトが表示されないようにマニフェストを適用します。
+* パッチを当てた`patch.exe`を使用します。
 
-As such, `PATCH_CMD` lets us apply patches as we do on Linux, without requiring
-an administrative prompt.
+そのため、`PATCH_CMD`を使えば、Linuxと同じように、管理者のプロンプトを必要とせずにパッチを適用することができます。
 
-Note that on Windows, the patch file must have CRLF line endings. A file with LF
-line endings will cause the error: "Assertion failed, hunk, file patch.c, line
-343". For this reason, it is required to checkout the Mesos repo with `git
-config core.autocrlf true`.
+なお、Windowsでは、パッチファイルの改行コードはCRLFでなければなりません。改行コードがLFのファイルはエラーになります。"Assertion failed, hunk, file patch.c, line 343" このため、`git config core.autocrlf true`でMesos repoをチェックアウトする必要があります。

@@ -5,33 +5,27 @@ layout: documentation
 
 # Windows
 
-Mesos 1.0.0 introduced experimental support for Windows.
+Mesos 1.0.0では、Windowsを実験的にサポートしました。
 
-## Building Mesos
+## Mesosの構築
 
-### System Requirements
+### システム要件
 
-1. Install the latest [Visual Studio 2017](https://www.visualstudio.com/downloads/):
-   The "Community" edition is sufficient (and free of charge).
-   During installation, choose the "Desktop development with C++" workload.
+1. 最新の[Visual Studio 2017](https://www.visualstudio.com/downloads/)をインストールします。Community版で十分です。（無料）インストール時に、「C++によるデスクトップ開発」のワークロードを選択します。
 
-2. Install [CMake 3.8.0](https://cmake.org/download/) or later.
-   During installation, choose to "Add CMake to the system PATH for all users".
+2. CMake [CMake 3.8.0](https://cmake.org/download/)以降をインストールします。インストールの際、「Add CMake to the system PATH for all users」を選択してください。
 
-3. Install [GNU patch for Windows](http://gnuwin32.sourceforge.net/packages/patch.htm).
+3. Windows用の[GNUパッチ](http://gnuwin32.sourceforge.net/packages/patch.htm)をインストールする。
 
-4. If building from source, install [Git](https://git-scm.com/download/win).
+4. ソースからビルドする場合は、[Git](https://git-scm.com/download/win)をインストールします。
 
-5. Make sure there are no spaces in your build directory.
-   For example, `C:/Program Files (x86)/mesos` is an invalid build directory.
+5. ビルドディレクトリにスペースがないことを確認してください。例えば、`C:/Program Files (x86)/mesos`は無効なビルドディレクトリです。
 
-6. If developing Mesos, install [Python 3](https://www.python.org/downloads/)
-   (not Python 2), in order to use our `support` scripts (e.g.
-   to post and apply patches, or lint source code).
+6. Mesosを開発している場合は、Python 2ではなく[Python 3](https://www.python.org/downloads/)をインストールしてください。これは、当社のサポートスクリプト（パッチの投稿や適用、ソースコードのlintなど）を使用するためです。
 
-### Build Instructions
+### 構築手順
 
-Following are the instructions for Windows 10.
+以下は、Windows 10での手順です。
 
     # Clone (or extract) Mesos.
     git clone https://gitbox.apache.org/repos/asf/mesos.git
@@ -51,73 +45,56 @@ Following are the instructions for Windows 10.
     # master, using eiher an IP address or zookeeper information.
     .\src\mesos-agent.exe --master=<master> --work_dir=<work folder> --launcher_dir=<repository>\build\src
 
-## Running Mesos
+## Mesosの起動
+
+実行ファイルを別のマシンに展開する場合は、[Microsoft Visual C++ Redistributable for Visual Studio 2017](https://aka.ms/vs/15/release/VC_redist.x64.exe)もインストールする必要があります。
 
 If you deploy the executables to another machine, you must also
 install the [Microsoft Visual C++ Redistributable for Visual Studio 2017](https://aka.ms/vs/15/release/VC_redist.x64.exe).
 
-## Known Limitations
+## 既知の制限事項
 
-The current implementation is known to have the following limitations:
+現在の実装では、以下のような制限があることが分かっています。:
 
-* Only the agent should be run on Windows. The Mesos master can be
-  launched, but only for testing as the master does not support
-  high-availability setups on Windows.
+* Windowsではエージェントのみを実行する必要があります。Mesosマスターを起動することもできますが、マスターはWindowsでの高可用セットアップをサポートしていないため、テスト用にのみ使用してください。
 
-* While Mesos supports NTFS long paths internally, tasks which do not support
-  long paths must be run on agent whose `--work_dir` is a short path.
+* Mesosは内部的にNTFSのロングパスをサポートしていますが、ロングパスをサポートしていないタスクは、`-work_dir`がショートパスのエージェントで実行する必要があります。
 
-* The minimum versions of Windows supported are: Windows 10 Creators Update (AKA
-  version 1703, build number 15063), and [Windows Server, version 1709][server].
-  It is likely that this will increase, due to evolving Windows container
-  support and developer features which ease porting.
+* 対応するWindowsの最小バージョンは Windows 10 Creators Update（別名：バージョン1703、ビルド番号15063）、および[Windows Server（バージョン1709）][server]です。Windowsコンテナのサポートや移植を容易にする開発者向けの機能が進化しているため、今後も増える可能性があります。
 
-* The ability to [create symlinks][] as a non-admin user requires
-  Developer Mode to be enabled. Otherwise the agent will need to be
-  run under an administrator.
+* 非管理者として[シンボリックリンクを作成する][create symlinks]には、開発者モードを有効にする必要があります。それ以外の場合は、エージェントを管理者の下で実行する必要があります。
 
 [server]: https://docs.microsoft.com/en-us/windows-server/get-started/get-started-with-1709
 [create symlinks]: https://blogs.windows.com/buildingapps/2016/12/02/symlinks-windows-10/
 
-## Build Configuration Examples
+## ビルド構成の例
 
-### Building with Ninja
+### Ninjaでのビルド
 
-Instead of using MSBuild, it is also possible to build Mesos on
-Windows using [Ninja](https://ninja-build.org/), which can result in
-significantly faster builds. To use Ninja, you need to download it and
-ensure `ninja.exe` is in your `PATH`.
+MSBuildを使用する代わりに、[Ninja](https://ninja-build.org/)を使用してWindows上でMesosをビルドすることも可能で、その場合はビルドが大幅に速くなります。Ninjaを使用するには、Ninjaをダウンロードして、`ninja.exe`が`PATH`に含まれていることを確認する必要があります。
 
-* Download the [Windows binary](https://github.com/ninja-build/ninja/releases).
-* Unzip it and place `ninja.exe` in your `PATH`.
-* Open an "x64 Native Tools Command Prompt for VS 2017" to set your
-  environment.
-* In that command prompt, type `powershell` to use a better shell.
-* Similar to above, configure CMake with `cmake .. -G Ninja`.
-* Now you can use `ninja` to build the various targets.
-* You may want to use `ninja -v` to make it verbose, as it's otherwise
-  very quiet.
+* [Windowsバイナリ]((https://github.com/ninja-build/ninja/releases))をダウンロードする。
+* 解凍して、`ninja.exe`を`PATH`に入れてください。
+* 環境を整えるために「x64 Native Tools Command Prompt for VS 2017」を開きます。
+* そのコマンドプロンプトで、`powershell`と入力すると、より良いシェルを使うことができます。
+* 上記と同様に、`cmake .. -G Ninja`でCMakeを設定します。
+* これで、`ninja`を使って様々なターゲットを作ることができます。
+* それ以外は暗黙なので、`ninja -v`を使って冗長にするとよいでしょう。
 
-Note that with Ninja it is imperative to open the correct developer
-command prompt so that the 64-bit build tools are used, as Ninja does
-not otherwise know how to find them.
+なお、Ninjaでは、64ビットのビルドツールを使用するために、正しい開発者用コマンドプロンプトを開く必要があります。（Ninjaでは64ビットのビルドツールを見つける方法がわからないため）
 
-### Building with Java
+### Javaでのビルド
 
-This enables more unit tests, but we do not yet officially produce
-`mesos-master`.
+これにより、より多くのユニットテストが可能になりますが、まだ`mesos-master`を公式には作成していません。
 
-When building with Java on Windows, you must add the [Maven][] build tool to
-your path. The `JAVA_HOME` environment variable must also be manually set.
-An installation of the Java SDK can be found form [Oracle][].
+WindowsでJavaを使ってビルドする場合は、[Maven][]ビルドツールをパスに追加する必要があります。また、`JAVA_HOME`環境変数を手動で設定する必要があります。Java SDKのインストールは、[Oracle][]社のフォームに記載されています。
 
 [maven]: https://maven.apache.org/guides/getting-started/windows-prerequisites.html
 [oracle]: http://www.oracle.com/technetwork/java/javase/downloads/index.html
 
-As of this writing, Java 9 is not yet supported, but Java 8 has been tested.
+この記事を書いている時点では、Java 9はまだサポートされていませんが、Java 8はテストされています。
 
-The Java build defaults to `OFF` because it is slow. To build the Java
-components on Windows, turn it `ON`:
+Javaのビルドは遅いので、デフォルトでは`OFF`になっています。WindowsでJavaコンポーネントをビルドするには、次のようにして`ON`にします。:
 
 ```powershell
 mkdir build; cd build
@@ -126,45 +103,34 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk1.8.0_144"
 cmake .. -DENABLE_JAVA=ON -G "Visual Studio 15 2017 Win64" -T "host=x64"
 cmake --build . --target mesos-java
 ```
+`mesos-java`ライブラリを手動で構築する必要はありません。Javaが有効な場合、`libmesos`がリンクします。
 
-Note that the `mesos-java` library does not have to be manually built; as
-`libmesos` will link it when Java is enabled.
-
-Unfortunately, on Windows the `FindJNI` CMake module will populate `JAVA_JVM_LIBRARY` with
-the path to the static `jvm.lib`, but this variable must point to the shared
-library, `jvm.dll`, as it is loaded at runtime. Set it correctly like this:
+残念ながら、Windowsでは`FindJNI` CMakeモジュールが`JAVA_JVM_LIBRARY`に静的な`jvm.lib`へのパスを入力しますが、この変数は実行時にロードされる共有ライブラリ`jvm.dll`を指していなければなりません。次のように正しく設定してください。:
 
 ```
 $env:JAVA_JVM_LIBRARY = "C:\Program Files\Java\jdk1.8.0_144\jre\bin\server\jvm.dll"
 ```
 
-The library may still fail to load at runtime with the following error:
+この場合、ランタイムにライブラリのロードに失敗し、次のようなエラーが発生することがあります。:
 
 > "The specified module could not be found."
 
-If this is the case, and the path to `jvm.dll` is verified to be correct, then
-the error message actually indicates that the dependencies of `jvm.dll` could
-not be found. On Windows, the DLL search path includes the environment variable
-`PATH`, so add the `bin` folder which contains `server\jvm.dll` to `PATH`:
+この場合、`jvm.dll`へのパスが正しいことが確認されると、エラーメッセージは実際には`jvm.dll`の依存関係が見つからないことを示しています。Windowsでは、DLLの検索パスには環境変数`PATH`が含まれていますので、`server\jvm.dll`を含むbinフォルダを`PATH`に追加してください。:
 
 ```
 $env:PATH += ";C:\Program Files\Java\jdk1.8.0_144\jre\bin"
 ```
 
-### Building with OpenSSL
+### OpenSSLでのビルド
 
-When building with OpenSSL on Windows, you must build or install a distribution
-of OpenSSL for Windows. A commonly chosen distribution is
-[Shining Light Productions' OpenSSL][openssl].
+WindowsでOpenSSLを使ってビルドする場合、Windows用のOpenSSLのディストリビューションをビルドまたはインストールする必要があります。一般的には、[Shining Light Productions社のOpenSSL][openssl]がよく使われています。
 
 [openssl]: https://slproweb.com/products/Win32OpenSSL.html
 
-As of this writing, OpenSSL 1.1.x is supported.
+この記事を書いている時点では、OpenSSL 1.1.xがサポートされています。
 
-Use `-DENABLE_SSL=ON` to build with OpenSSL.
+OpenSSLでビルドするには、`-DENABLE_SSL=ON`を使用してください。
 
-Note that it will link to OpenSSL dynamically, so if the built executables are
-deployed elsewhere, that machine also needs OpenSSL installed.
+OpenSSLに動的にリンクするので、ビルドした実行ファイルを別の場所に配置する場合は、そのマシンにもOpenSSLをインストールする必要があることに注意してください。
 
-Beware that the OpenSSL installation, nor Mesos itself, comes with a certificate
-bundle, and so it is likely that certificate verification will fail.
+OpenSSLのインストールやMesos自体には証明書がバンドルされていないため、証明書の検証に失敗する可能性があることに注意してください。

@@ -12,67 +12,65 @@ Mesosマスターが利用できない場合、既存のタスクは継続して
 **注**: 本ドキュメントは、Mesosの標準ビルドに含まれるクライアント・ライブラリであるZooKeeperの起動、実行、および操作方法を知っていることを前提としています。
 
 ## 使用方法
-To put Mesos into high-availability mode:
+Mesosを高可用モードにするには:
 
-1. Ensure that the ZooKeeper cluster is up and running.
+1. ZooKeeperクラスタが稼働していることを確認します。
 
-2. Provide the znode path to all masters, agents, and framework schedulers as follows:
+2. znodeパスを全てのマスター、エージェント、フレームワーク・スケジューラーに以下のように提供します。:
 
-    * Start the mesos-master binaries using the `--zk` flag, e.g. `--zk=zk://host1:port1,host2:port2,.../path`
+    * `--zk=zk://host1:port1,host2:port2,.../path`のように、`--zk`フラグを使ってmesos-masterのバイナリを起動します。
 
-    * Start the mesos-agent binaries with `--master=zk://host1:port1,host2:port2,.../path`
+    * mesos-agentのバイナリを`--master=zk://host1:port1,host2:port2,.../path`で起動します。
 
-    * Start any framework schedulers using the same `zk` path as in the last two steps. The SchedulerDriver must be constructed with this path, as shown in the [Framework Development Guide](app-framework-development-guide.md).
+    * 前の2つのステップと同じzkパスを使用して、任意のフレームワークのスケジューラを起動します。[フレームワーク開発ガイド](app-framework-development-guide.md)にあるように、SchedulerDriverはこのパスで構築する必要があります。
 
-From now on, the Mesos masters and agents all communicate with ZooKeeper to find out which master is the current leading master. This is in addition to the usual communication between the leading master and the agents.
+これ以降、MesosのマスターとエージェントはすべてZooKeeperと通信し、どのマスターが現在のリーディングマスターであるかを調べます。これは、リーディングマスターとエージェント間の通常の通信に加えて行われます。
 
-In addition to ZooKeeper, one can get the location of the leading master by sending an HTTP request to [/redirect](endpoints/master/redirect.md) endpoint on any master.
+ZooKeeper以外にも、任意のマスターの[/redirect](endpoints/master/redirect.md)エンドポイントにHTTPリクエストを送ることで、リーディングマスターの位置を知ることができます。
 
-For HTTP endpoints that only work at the leading master, requests made to endpoints at a non-leading master will result in either a `307 Temporary Redirect` (with the location of the leading master) or `503 Service Unavailable` (if the master does not know who the current leader is).
+リーディングマスターでのみ動作するHTTPエンドポイントの場合、リーディングマスターでないマスターのエンドポイントへのリクエストは、`307 Temporary Redirect` (リーディングマスターの位置を示す)または`503 Service Unavailable` (マスターが現在のリーダーを知らない場合)のいずれかになります。
 
-Refer to the [Scheduler API](app-framework-development-guide.md) for how to deal with leadership changes.
+リーダーの変更に対処する方法については、[Scheduler API](app-framework-development-guide.md)を参照してください。
 
-## Component Disconnection Handling
-When a network partition disconnects a component (master, agent, or scheduler driver) from ZooKeeper, the component's Master Detector induces a timeout event. This notifies the component that it has no leading master. Depending on the component, the following happens. (Note that while a component is disconnected from ZooKeeper, a master may still be in communication with agents or schedulers and vice versa.)
+## コンポーネントの切断処理
+ネットワークパーティションがコンポーネント(マスター、エージェント、スケジューラドライバ)をZooKeeperから切り離すと、コンポーネントのマスター検出器はタイムアウトイベントを発生させる。これにより、コンポーネントはリードするマスターがいないことを通知します。コンポーネントによっては、以下のようになる。(コンポーネントがZooKeeperから切断されている間も、マスターはエージェントやスケジューラと通信している可能性があり、その逆もまた然りであることに注意)
 
-* Agents disconnected from ZooKeeper no longer know which master is the leader. They ignore messages from masters to ensure they don't act on a non-leader's decisions. When an agent reconnects to ZooKeeper, ZooKeeper informs it of the current leader and the agent stops ignoring messages from the leader.
+* ZooKeeperから切り離されたエージェントは、どのマスターがリーダーなのか分からなくなりました。エージェントは、リーダーではないマスターの判断で行動しないように、マスターからのメッセージを無視する。エージェントがZooKeeperに再接続すると、ZooKeeperは現在のリーダを通知し、エージェントはリーダーからのメッセージを無視しなくなる。
 
-* Masters enter leaderless state irrespective of whether they are a leader or not before the disconnection.
+* マスターは、切断前にリーダーであったかどうかに関わらず、リーダーレス状態になります。
 
-    * If the leader was disconnected from ZooKeeper, it aborts its process. The user/developer/administrator can then start a new master instance which will try to reconnect to ZooKeeper.
-      * Note that many production deployments of Mesos use a process supervisor (such as systemd or supervisord) that is configured to automatically restart the Mesos master if the process aborts unexpectedly.
+    * リーダーがZooKeeperから切断された場合、その処理を中止する。ユーザ/開発者/管理者は、ZooKeeperに再接続しようとする新しいマスター・インスタンスを起動することができる。
+      * なお、Mesosの多くのプロダクションデプロイメントでは、プロセスが予期せず中止された場合にMesosマスターを自動的に再起動するように設定されたプロセススーパーバイザー（systemdやsupervisordなど）が使用されています。
 
-    * Otherwise, the disconnected backup waits to reconnect with ZooKeeper and possibly get elected as the new leading master.
+    * そうでなければ、切断されたバックアップはZooKeeperとの再接続を待ち、新しいリーディングマスターに選出される可能性がある。
 
-* Scheduler drivers disconnected from the leading master notify the scheduler about their disconnection from the leader.
+* リーディングマスターから切断されたスケジューラーのドライバーは、リーディングマスターからの切断をスケジューラーに通知します。
 
-When a network partition disconnects an agent from the leader:
+ネットワーク・パーティションによってエージェントがリーダーから切り離されると:
 
-* The agent fails health checks from the leader.
+* エージェントは、リーダーからのヘルスチェックに失敗します。
 
-* The leader marks the agent as deactivated and sends its tasks to the LOST state. The  [Framework Development Guide](app-framework-development-guide.md) describes these various task states.
+* リーダーは、エージェントを停止したと判断し、そのタスクをLOST状態に送ります。[フレームワーク開発ガイド](app-framework-development-guide.md)では、これらの様々なタスクの状態について説明しています。
 
-* Deactivated agents may not reregister with the leader and are told to shut down upon any post-deactivation communication.
+* 一度停止したエージェントは、リーダーに再登録することはできず、停止後の連絡の際にはシャットダウンするように言われます。
 
-## Monitoring
-For monitoring the current number of masters in the cluster communicating with each other to form a quorum, see the monitoring guide's [Replicated Log](monitoring.md#replicated-log) on `registrar/log/ensemble_size`.
-For creating alerts covering failures in leader election, have a look at the monitoring guide's [Basic Alerts](monitoring.md#basic-alerts) on `master/elected`.
+## 監視
+クォーラムを形成するために相互に通信しているクラスタ内のマスターの現在の数を監視するには、監視ガイドの`registrar/log/ensemble_size`の[Replicated Log](monitoring.md#replicated-log)を参照してください。リーダー選出の失敗をカバーするアラートを作成するには、モニタリングガイドの`master/elected`の[Basic Alerts](monitoring.md#basic-alerts)を参照してください。
 
-## Implementation Details
-Mesos implements two levels of ZooKeeper leader election abstractions, one in `src/zookeeper` and the other in `src/master` (look for `contender|detector.hpp|cpp`).
+## 実装の詳細
+Mesosは2段階のZooKeeperリーダー選挙の抽象化を実装しています。1つは`src/zookeeper`に、もう1つは`src/master`にあります。（`contender|detector.hpp|cpp`を参照してください）
 
-* The lower level `LeaderContender` and `LeaderDetector` implement a generic ZooKeeper election algorithm loosely modeled after this
-[recipe](http://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection) (sans herd effect handling due to the master group's small size, which is often 3).
+* 下位の`LeaderContender`と`LeaderDetector`は、ZooKeeperの一般的な選挙アルゴリズムを実装する (マスターグループのサイズが3と小さいため、群れの影響を処理していない→[詳しくは](http://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection))。
 
-* The higher level `MasterContender` and `MasterDetector` wrap around ZooKeeper's contender and detector abstractions as adapters to provide/interpret the ZooKeeper data.
+* 上位の`MasterContender`と`MasterDetector`は、ZooKeeperのコンテンダーとディテクターの抽象化を、ZooKeeperのデータを提供/解釈するアダプタとして実装する。
 
-* Each Mesos master simultaneously uses both a contender and a detector to try to elect themselves and detect who the current leader is. A separate detector is necessary because each master's WebUI redirects browser traffic to the current leader when that master is not elected. Other Mesos components (i.e., agents and scheduler drivers) use the detector to find the current leader and connect to it.
+* 各Mesosマスターは、コンテンダーとディテクターの両方を同時に使用して、自分自身を選出し、現在のリーダーが誰であるかを検出しようとする。各マスターのWebUIは、そのマスターが選出されていない場合、ブラウザのトラフィックを現在のリーダーにリダイレクトするため、別の検出器が必要です。他のMesosコンポーネント（エージェントやスケジューラドライバなど）は、ディテクターを使用して現在のリーダーを見つけ、そこに接続します。
 
-The notion of the group of leader candidates is implemented in `Group`. This abstraction handles reliable (through queues and retries of retryable errors under the covers) ZooKeeper group membership registration, cancellation, and monitoring. It watches for several ZooKeeper session events:
+リーダー候補のグループという概念はGroupで実装されている。この抽象化は、(キューとカバー下の再試行可能なエラーによる)信頼性の高い ZooKeeper グループメンバーシップの登録、キャンセル、監視を行う。いくつかのZooKeeperセッションイベントを監視する。:
 
-* Connection
-* Reconnection
-* Session Expiration
-* ZNode creation, deletion, updates
+* 接続
+* 再接続
+* セッションの有効期限
+* ZNodeの作成、削除、更新
 
-We also explicitly timeout our sessions when disconnected from ZooKeeper for a specified amount of time. See `--zk_session_timeout` configuration option. This is because the ZooKeeper client libraries only notify of session expiration upon reconnection. These timeouts are of particular interest for network partitions.
+また、ZooKeeperとの接続が切れたときには、セッションを明示的にタイムアウトさせます。設定オプション `--zk_session_timeout` を参照。これは、ZooKeeperクライアントライブラリは再接続時にのみセッションの失効を通知するからです。これらのタイムアウトはネットワーク・パーティションの場合に特に注意が必要です。

@@ -3,80 +3,75 @@ title: Apache Mesos - The Mesos Replicated Log
 layout: documentation
 ---
 
-# The Mesos Replicated Log
+# Mesosの複製されたログ
+Mesosには、複製されたフォールトトレラントなアペンドオンリーログを作成するためのライブラリが用意されています。Mesosマスターはこのライブラリを使用して、複製された耐久性のある方法でクラスタの状態を保存します。このライブラリは、複製されたフレームワークの状態を保存したり、一般的な[複製されたステートマシン](https://en.wikipedia.org/wiki/State_machine_replication)パターンを実装したりするフレームワークでも使用できます。
 
-Mesos provides a library that lets you create replicated fault-tolerant append-only logs; this library is known as the _replicated log_. The Mesos master uses this library to store cluster state in a replicated, durable way; the library is also available for use by frameworks to store replicated framework state or to implement the common "[replicated state machine](https://en.wikipedia.org/wiki/State_machine_replication)" pattern.
-
-## What is the replicated log?
+## 複製されたログとは？
 
 ![Aurora and the Replicated Log](images/log-cluster.png)
 
-The replicated log provides _append-only_ storage of _log entries_; each log entry can contain arbitrary data. The log is _replicated_, which means that each log entry has multiple copies in the system. Replication provides both fault tolerance and high availability. In the following example, we use [Apache Aurora](https://aurora.apache.org/), a fault tolerant scheduler (i.e., framework) running on top of Mesos, to show a typical replicated log setup.
+複製されたログでは、ログエントリの保存は追記のみで、各ログエントリには任意のデータを含めることができます。ログは複製されるため、各ログエントリはシステム内に複数のコピーを持ちます。レプリケーションは、フォールトトレランスとハイアベイラビリティを提供します。以下の例では、Mesos上で動作するフォールト・トレラント・スケジューラ（すなわちフレームワーク）である[Apache Aurora](https://aurora.apache.org/)を使用して、典型的なレプリケートされたログのセットアップを示しています。
 
-As shown above, there are multiple Aurora instances running simultaneously (for high availability), with one elected as the leader. There is a log replica on each host running Aurora. Aurora can access the replicated log through a thin library containing the log API.
+上図のように、複数のAuroraインスタンスが同時に動作しており（高可用性のため）、そのうちの1つがリーダーに選ばれています。Auroraが動作している各ホストには、ログのレプリカがあります。Auroraは、ログAPIを含むシンライブラリを介して、複製されたログにアクセスできます。
 
-Typically, the leader is the only one that appends data to the log. Each log entry is replicated and sent to all replicas in the system. Replicas are strongly consistent. In other words, all replicas agree on the value of each log entry. Because the log is replicated, when Aurora decides to failover, it does not need to copy the log from a remote host.
+通常、リーダーはログにデータを追加する唯一のマスターです。各ログエントリは複製され、システム内のすべてのレプリカに送信されます。レプリカは強い一貫性を持っています。つまり、すべてのレプリカは、各ログ・エントリの値に同意します。ログが複製されているので、Auroraがフェイルオーバーを決定する際に、リモートホストからログをコピーする必要はありません。
 
+## 利用例
+複製されたログは、さまざまな分散型アプリケーションの構築に利用できます。たとえば、Auroraでは、複製されたログを使って、すべてのタスクの状態やジョブの設定を保存しています。また、Mesosマスターのレジストリは、複製されたログを活用して、クラスタ内のすべてのエージェントに関する情報を保存します。
 
-## Use Cases
+複製されたログは、アプリケーションがレプリケートされた状態を強い一貫性のある方法で管理するためによく使われます。これを実現する1つの方法は、各ログエントリに状態を変更する操作を保存し、分散アプリケーションのすべてのインスタンスが同じ初期状態（例えば、空の状態）に同意することです。複製されたログは、各アプリケーション・インスタンスが同じ順序で同じログ・エントリのシーケンスを観察することを保証します。状態変更操作の適用が決定論的である限り、これによりすべてのアプリケーション・インスタンスが互いに一貫性を保つことができます。アプリケーションのいずれかのインスタンスがクラッシュした場合、初期状態から始めて、ログに記録されたすべての変異を順に適用することで、複製された状態の現在のバージョンを再構築することができます。
 
-The replicated log can be used to build a wide variety of distributed applications. For example, Aurora uses the replicated log to store all task states and job configurations. The Mesos master's _registry_ also leverages the replicated log to store information about all agents in the cluster.
+ログが大きくなりすぎた場合、アプリケーションはスナップショットを書き出し、そのスナップショット以前に発生したすべてのログエントリを削除することができます。このアプローチを使用すると、Mesosでは、複製されたログをバックエンドとして[分散状態](https://github.com/apache/mesos/blob/master/src/state/state.hpp)の抽象化を公開することになります。
 
-The replicated log is often used to allow applications to manage replicated state in a strongly consistent way. One way to do this is to store a state-mutating operation in each log entry and have all instances of the distributed application agree on the same initial state (e.g., empty state). The replicated log ensures that each application instance will observe the same sequence of log entries in the same order; as long as applying a state-mutating operation is deterministic, this ensures that all application instances will remain consistent with one another. If any instance of the application crashes, it can reconstruct the current version of the replicated state by starting at the initial state and re-applying all the logged mutations in order.
+同様に、複製されたログを使用して、[複製された状態のマシン](https://en.wikipedia.org/wiki/State_machine_replication)を構築することができます。このシナリオでは、各ログ・エントリはステート・マシン・コマンドを含んでいます。複製は強く一貫しているので、すべてのサーバーは同じコマンドを同じ順序で実行します。
 
-If the log grows too large, an application can write out a snapshot and then delete all the log entries that occurred before the snapshot. Using this approach, we will be exposing a [distributed state](https://github.com/apache/mesos/blob/master/src/state/state.hpp) abstraction in Mesos with replicated log as a backend.
-
-Similarly, the replicated log can be used to build [replicated state machines](https://en.wikipedia.org/wiki/State_machine_replication). In this scenario, each log entry contains a state machine command. Since replicas are strongly consistent, all servers will execute the same commands in the same order.
-
-## Implementation
+## 実装
 
 ![Replicated Log Architecture](images/log-architecture.png)
 
-The replicated log uses the [Paxos consensus algorithm](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29) to ensure that all replicas agree on every log entry's value. It is similar to what's described in [these slides](https://ramcloud.stanford.edu/~ongaro/userstudy/paxos.pdf). Readers who are familiar with Paxos can skip this section.
+複製されたログは、すべてのレプリカがすべてのログエントリの値に同意することを保証するために、[Paxosのコンセンサスアルゴリズム](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29)を使用しています。これは、[このスライド](https://ramcloud.stanford.edu/~ongaro/userstudy/paxos.pdf)で説明されていることと同様です。Paxosに慣れている読者は、このセクションを読み飛ばしても構いません。
 
-The above figure is an implementation overview. When a user wants to append data to the log, the system creates a log writer. The log writer internally creates a coordinator. The coordinator contacts all replicas and executes the Paxos algorithm to make sure all replicas agree about the appended data. The coordinator is sometimes referred to as the [_proposer_](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29).
+上の図は、実装の概要です。ユーザーがログにデータを追加したい場合、システムはログライターを作成します。ログ・ライターは内部でコーディネータを作成します。コーディネーターはすべてのレプリカに連絡を取り、Paxosアルゴリズムを実行して、すべてのレプリカが追記されたデータについて合意することを確認します。コーディネーターは、[プロポーザー](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29)と呼ばれることもあります。
 
-Each replica keeps an array of log entries. The array index is the log position. Each log entry is composed of three components: the value written by the user, the associated Paxos state and a _learned_ bit where true means this log entry's value has been agreed. Therefore, a replica in our implementation is both an [_acceptor_](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29) and a [_learner_](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29).
+各レプリカは、ログ・エントリの配列を保持しています。配列のインデックスがログの位置になります。各ログ・エントリは、ユーザが書き込んだ値、関連するPaxosの状態、そして、このログ・エントリの値が合意されたことを意味する学習ビットの3つの要素で構成されています。したがって，我々の実装では，レプリカは[Acceptor](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29)でもあり[Learner](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29)でもあります。
 
-### Reaching consensus for a single log entry
+### 1つのログエントリの合意を得るために
+Paxosのラウンドは、すべてのレプリカが1つのログ・エントリの値について合意に達するのを助けることができます。ラウンドには2つのフェーズがあります：promiseフェーズとwriteフェーズです。[Paxosの原著論文](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf)とは若干異なる用語を使用していることに注意してください。我々の実装では、原著論文のprepareおよびacceptフェーズは、それぞれ promiseおよびwriteフェーズと呼ばれています。その結果、prepareリクエスト(レスポンス)はpromiseリクエスト(レスポンス)と呼ばれ、acceptリクエスト(レスポンス)はwriteリクエスト(レスポンス)と呼ばれています。
 
-A Paxos round can help all replicas reach consensus on a single log entry's value. It has two phases: a promise phase and a write phase. Note that we are using slightly different terminology from the [original Paxos paper](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf). In our implementation, the _prepare_ and _accept_ phases in the original paper are referred to as the _promise_ and _write_ phases, respectively. Consequently, a prepare request (response) is referred to as a promise request (response), and an accept request (response) is referred to as a write request (response).
+位置pのログに値Xを追加するために、コーディネータはまず、proposal番号nを持つすべてのレプリカにpromiseリクエストをブロードキャストし、nより小さいproposal番号の要求（promise／writeリクエスト）には応答しないことをレプリカに保証してもらう。
 
-To append value _X_ to the log at position _p_, the coordinator first broadcasts a promise request to all replicas with proposal number _n_, asking replicas to promise that they will not respond to any request (promise/write request) with a proposal number lower than _n_. We assume that _n_ is higher than any other previously used proposal number, and will explain how we do this later.
+promiseリクエストを受け取ると、各レプリカは自分のPaxosの状態をチェックし、以前に配ったpromiseに応じて、そのリクエストに安全に応答できるかどうかを判断します。レプリカがpromiseを与えることができる場合（つまり、proposal番号のチェックをパスした場合）、まずそのpromise（proposal番号n）をディスクに永続化し、promiseレスポンスを返信します。もしレプリカが以前に書き込まれていた(つまりwriteリクエストを受け入れた)場合は、以前に書き込まれた値と、そのwriteリクエストで使われたproposal番号を、これから送ろうとしているpromiseレスポンスに含める必要があります。
 
-When receiving the promise request, each replica checks its Paxos state to decide if it can safely respond to the request, depending on the promises it has previously given out. If the replica is able to give the promise (i.e., passes the proposal number check), it will first persist its promise (the proposal number _n_) on disk and reply with a promise response. If the replica has been previously written (i.e., accepted a write request), it needs to include the previously written value along with the proposal number used in that write request into the promise response it's about to send out.
+[クォーラム](https://en.wikipedia.org/wiki/Quorum_%28distributed_computing%29)のレプリカからpromiseレスポンスを受け取ると、コーディネーターはまず、それらのレスポンスから以前に書き込まれた値が存在するかどうかをチェックします。以前に書き込まれた値が見つかった場合は、そのログエントリに対して既に値が合意されている可能性が高いため、追加操作を続行することはできません。これはPaxosの重要なアイデアの1つで、一貫性を確保するために書き込むことができる値を制限することです。
 
-Upon receiving promise responses from a [quorum](https://en.wikipedia.org/wiki/Quorum_%28distributed_computing%29) of replicas, the coordinator first checks if there exist any previously written value from those responses. The append operation cannot continue if a previously written value is found because it's likely that a value has already been agreed on for that log entry. This is one of the key ideas in Paxos: restrict the value that can be written to ensure consistency.
+以前に書き込まれた値が見つからない場合、コーディネーターは、値Xとproposal番号nを持つすべてのレプリカにwriteリクエストをブロードキャストします。writeリクエストを受け取ると、各レプリカは自分が与えたpromiseを再度確認し、writeリクエストのproposal番号が自分が保証したproposal番号と同じかそれ以上であれば、writeレスポンスを返します。コーディネーターがレプリカの定足数からwriteレスポンスを受け取ると、追加操作は成功します。
 
-If no previous written value is found, the coordinator broadcasts a write request to all replicas with value _X_ and proposal number _n_. On receiving the write request, each replica checks the promise it has given again, and replies with a write response if the write request's proposal number is equal to or larger than the proposal number it has promised. Once the coordinator receives write responses from a quorum of replicas, the append operation succeeds.
+### Multi-Paxosを使用した追加レイテンシの最適化
 
-### Optimizing append latency using Multi-Paxos
+複製されたログを実装するための1つの素朴な解決策は、各ログエントリに対して完全なPaxosラウンド（promiseフェーズとwriteフェーズ）を実行することです。[Paxosの原著論文](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf)で議論されているように、リーダーが比較的安定している場合、Multi-Paxosを使用することで、ほとんどの追記操作でpromiseフェーズが不要となり、結果的にパフォーマンスが向上します。
 
-One naive solution to implement a replicated log is to run a full Paxos round (promise phase and write phase) for each log entry. As discussed in the [original Paxos paper](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf), if the leader is relatively stable, _Multi-Paxos_ can be used to eliminate the need for the promise phase for most of the append operations, resulting in improved performance.
+これを実現するために、我々は暗黙のpromiseリクエストと呼ばれる新しいタイプのpromiseリクエストを導入しました。暗黙のpromiseリクエストは、(潜在的に無限の)ログ・エントリのセットに対するバッチ処理されたプロミス・リクエストと見なすことができます。暗黙のpromiseリクエストをブロードキャストすることは、概念的には、まだ値が合意されていないすべてのログエントリに対してpromiseリクエストをブロードキャストすることと同じです。コーディネータによってブロードキャストされた暗黙のpromiseリクエストがレプリカのクォーラムによって受け入れられた場合、このコーディネータは、まだ値が合意されていないログ・エントリに追加したい場合には、プロミス・フェーズを実行する必要はなくなる。したがって、この場合のコーディネーターは、選出された（別名、リーダー）と呼ばれ、複製されたログへの排他的なアクセス権を持っています。選出されたコーディネーターは、他のコーディネーターがより高いproposal番号で暗黙のpromiseリクエストをブロードキャストした場合、降格（または排他的アクセスを失う）する可能性があります。
 
-To do that, we introduce a new type of promise request called an _implicit_ promise request. An implicit promise request can be viewed as a _batched_ promise request for a (potentially infinite) set of log entries. Broadcasting an implicit promise request is conceptually equivalent to broadcasting a promise request for every log entry whose value has not yet been agreed. If the implicit promise request broadcasted by a coordinator gets accepted by a quorum of replicas, this coordinator is no longer required to run the promise phase if it wants to append to a log entry whose value has not yet been agreed because the promise phase has already been done in _batch_. The coordinator in this case is therefore called _elected_ (a.k.a., the leader), and has _exclusive_ access to the replicated log. An elected coordinator may be _demoted_ (or lose exclusive access) if another coordinator broadcasts an implicit promise request with a higher proposal number.
+残る問題は、まだ値が合意されていないログ・エントリをどうやって見つけるかということです。非常にシンプルな解決策があります。レプリカが暗黙のpromiseリクエストを受け入れた場合、そのレプリカの最大の既知のログ位置を応答に含めます。選出されたコーディネータは、pより大きい位置のログエントリのみを追加します。pはこれらの応答で見られるどのログ位置よりも大きいです。
 
-One question remaining is how can we find out those log entries whose values have not yet been agreed. We have a very simple solution: if a replica accepts an implicit promise request, it will include its largest known log position in the response. An elected coordinator will only append log entries at positions larger than _p_, where _p_ is greater than any log position seen in these responses.
+Multi-Paxosは、リーダーが安定していればパフォーマンスが向上します。複製されたログ自体はリーダーの選出を行いません。代わりに、複製されたログのユーザーが安定したリーダーを選ぶことに依存します。例えば、Auroraはリーダーの選出に[ZooKeeper](https://zookeeper.apache.org/)を使用しています。
 
-Multi-Paxos has better performance if the leader is stable. The replicated log itself does not perform leader election. Instead, we rely on the user of the replicated log to choose a stable leader. For example, Aurora uses [ZooKeeper](https://zookeeper.apache.org/) to elect the leader.
+### ローカル読み取りの有効化
+上述したように、私たちの実装では、各レプリカはAcceptorでもあり、Learnerでもあります。各レプリカをLearnerとして扱うことで、他のレプリカを介さずにローカルな読み取りを行うことができます。あるログ・エントリの値が合意されると、コーディネータは学習済みメッセージをすべてのレプリカにブロードキャストします。レプリカは学習済みメッセージを受け取ると、対応するログ・エントリの学習済みビットを設定し、そのログ・エントリの値が合意されたことを示します。学んだビットが設定されていれば、そのログ・エントリは「学習済み」になります。コーディネータはレプリカからの確認応答を待つ必要はありません。
 
-### Enabling local reads
+読み取りを実行するために、ログリーダーは基礎となるローカルレプリカを直接検索します。対応するログエントリが学習されていれば、ログリーダはその値をユーザに返すだけです。そうでなければ、合意した値を発見するためにPaxosのフルラウンドが必要です。選出されたコーディネーターがいるレプリカが、常にすべてのログ・エントリを学習していることを確認します。これは、コーディネーターが選出された後に、学習されていないログ・エントリに対してPaxosのフルラウンドを実行することで実現しています。
 
-As discussed above, in our implementation, each replica is both an acceptor and a learner. Treating each replica as a learner allows us to do local reads without involving other replicas. When a log entry's value has been agreed, the coordinator will broadcast a _learned_ message to all replicas. Once a replica receives the learned message, it will set the learned bit in the corresponding log entry, indicating the value of that log entry has been agreed. We say a log entry is "learned" if its learned bit is set. The coordinator does not have to wait for replicas' acknowledgments.
+### ガベージコレクションによるログサイズの削減
 
-To perform a read, the log reader will directly look up the underlying local replica. If the corresponding log entry is learned, the reader can just return the value to the user. Otherwise, a full Paxos round is needed to discover the agreed value. We always make sure that the replica co-located with the elected coordinator always has all log entries learned. We achieve that by running full Paxos rounds for those unlearned log entries after the coordinator is elected.
+ログが大きくなった場合、アプリケーションはログを切り詰めるという選択肢を持っています。切り捨てを実行するには、特別なログ・エントリを追加します。その値は、ユーザが切り捨てたいログの位置です。レプリカは、この特別なログ・エントリを学習すると、実際にログを切り詰めることができます。
 
-### Reducing log size using garbage collection
+### 固有のproposal番号
 
-In case the log grows large, the application has the choice to truncate the log. To perform a truncation, we append a special log entry whose value is the log position to which the user wants to truncate the log. A replica can actually truncate the log once this special log entry has been learned.
+[Paxosの研究論文](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf)の多くは、各proposal番号がグローバルに一意であり、コーディネーターは常にシステム内の他のproposal番号よりも大きいproposal番号を考え出すことができると仮定しています。しかし、これを実装することは、特に分散環境においては、簡単ではありません。[一部の研究者は、グローバルに一意なサーバIDを各proposal番号に連結することを提案しています。](https://ramcloud.stanford.edu/~ongaro/userstudy/paxos.pdf)しかし、各サーバーにグローバルに一意なIDを生成する方法はまだ明らかではありません。
 
-### Unique proposal number
+我々のソリューションは、上記のような仮定をしていません。コーディネーターは、最初は任意のproposal番号を使うことができます。promiseフェーズで、レプリカがコーディネーターが使ったproposal番号よりも大きいproposal番号を知っている場合、そのレプリカはコーディネーターに最大の既知のproposal番号を送り返す。コーディネータは、より大きなproposal番号でpromiseフェーズを再試行します。
 
-Many of the [Paxos research papers](https://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf) assume that each proposal number is globally unique, and a coordinator can always come up with a proposal number that is larger than any other proposal numbers in the system. However, implementing this is not trivial, especially in a distributed environment. [Some researchers suggest](https://ramcloud.stanford.edu/~ongaro/userstudy/paxos.pdf) concatenating a globally unique server id to each proposal number. But it is still not clear how to generate a globally unique id for each server.
-
-Our solution does not make the above assumptions. A coordinator can use an arbitrary proposal number initially. During the promise phase, if a replica knows a proposal number higher than the proposal number used by the coordinator, it will send the largest known proposal number back to the coordinator. The coordinator will retry the promise phase with a higher proposal number.
-
-To avoid livelock (e.g., when two coordinators completing), we inject a randomly delay between T and 2T before each retry. T has to be chosen carefully. On one hand, we want T >> broadcast time such that one coordinator usually times out and wins before others wake up. On the other hand, we want T to be as small as possible such that we can reduce the wait time. Currently, we use T = 100ms. This idea is actually borrowed from [Raft](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf).
+ライブロックを避けるために（例えば、2つのコーディネーターが完了した場合）、各リトライの前にTから2Tの間のランダムな遅延を注入します。Tは慎重に選ぶ必要があります。一方では、T >> ブロードキャスト時間にして、他が起動する前に1つのコーディネーターが通常タイムアウトして勝利するようにします。一方で、Tはできるだけ小さくして、待ち時間を短縮したいと考えています。現在、私たちはT = 100msを使用しています。このアイデアは、実は[Raft](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf)からの借用です。
 
 ## Automatic replica recovery
 

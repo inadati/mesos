@@ -3,113 +3,56 @@ title: Apache Mesos - Agent Recovery
 layout: documentation
 ---
 
-# Agent Recovery
+# エージェントのリカバリー
 
-If the `mesos-agent` process on a host exits (perhaps due to a Mesos bug or
-because the operator kills the process while [upgrading Mesos](upgrades.md)),
-any executors/tasks that were being managed by the `mesos-agent` process will
-continue to run.
+ホスト上の`mesos-agent`プロセスが終了した場合(Mesosのバグ、またはオペレータが[Mesosのアップグレード](upgrades.md)中にプロセスを強制終了した場合)、`mesos-agent`プロセスが管理していたすべてのエクゼキュータ/タスクは引き続き実行されます。
 
-By default, all the executors/tasks that were being managed by the old
-`mesos-agent` process are expected to gracefully exit on their own, and
-will be shut down after the agent restarted if they did not.
+デフォルトでは、古い`mesos-agent`プロセスによって管理されていたすべてのエクゼキュータ/タスクは、自分自身で終了することが期待され、終了しなかった場合はエージェントの再起動後にシャットダウンされます。
 
-However, if a framework enabled  _checkpointing_ when it registered with the
-master, any executors belonging to that framework can reconnect to the new
-`mesos-agent` process and continue running uninterrupted. Hence, enabling
-framework checkpointing allows tasks to tolerate Mesos agent upgrades and
-unexpected `mesos-agent` crashes without experiencing any downtime.
+しかし、フレームワークがマスターへの登録時にチェックポイントを有効にしていれば、そのフレームワークに属するエクゼキュータは、新しい`mesos-agent`プロセスに再接続し、中断することなく実行を続けることができます。したがって、フレームワークのチェックポインティングを有効にすると、タスクは`mesos-agent`のアップグレードや予期せぬクラッシュにもダウンタイムを発生させることなく耐えることができます。
 
-Agent recovery works by having the agent checkpoint information about its own
-state and about the tasks and executors it is managing to local disk, for
-example the `SlaveInfo`, `FrameworkInfo` and `ExecutorInfo` messages or the
-unacknowledged status updates of running tasks.
+エージェントのリカバリは、エージェントが自身の状態や管理しているタスクやエクゼキュータに関する情報をローカルディスクにチェックポイントさせることで機能します。例えば、`SlaveInfo`、`FrameworkInfo`、`ExecutorInfo`メッセージや、実行中のタスクの確認されていないステータスアップデートなどです。
 
-When the agent restarts, it will verify that its current configuration, set
-from the environment variables and command-line flags, is compatible with the
-checkpointed information and will refuse to restart if not.
+エージェントの再起動時には、環境変数やコマンドライン・フラグから設定された現在の設定が、チェックポイントされた情報と互換性があるかどうかを確認し、互換性がない場合は再起動を拒否します。
 
-A special case occurs when the agent detects that its host system was rebooted
-since the last run of the agent: The agent will try to recover its previous ID
-as usual, but if that fails it will actually erase the information of the
-previous run and will register with the master as a new agent.
+特殊なケースとして、エージェントの最後の実行後にホストシステムが再起動されたことをエージェントが検出した場合があります。エージェントは通常通り前回のIDを回復しようとしますが、失敗した場合は実際に前回の実行の情報を消去し、新しいエージェントとしてマスターに登録します。
 
-Note that executors and tasks that exited between agent shutdown and restart
-are not automatically restarted during agent recovery.
+エージェントのシャットダウンから再起動までの間に終了したエクゼキュータやタスクは、エージェントの復旧時には自動的に再起動されないことに注意してください。
 
-## Framework Configuration
+## フレームワークの構成
+フレームワークは、マスターへの登録時に`FrameworkInfo`に`チェックポイントフラグ`を設定することで、そのエクゼキュータがリカバリされるかどうかを制御できます。この機能を有効にすると、フレームワークが起動したタスクを実行する各エージェントのI/Oオーバーヘッドが増加します。デフォルトでは、フレームワークはその状態をチェックポイントしません。
+## エージェントの構成
 
-A framework can control whether its executors will be recovered by setting
-the `checkpoint` flag in its `FrameworkInfo` when registering with the master.
-Enabling this feature results in increased I/O overhead at each agent that runs
-tasks launched by the framework. By default, frameworks do **not** checkpoint
-their state.
+4つの[設定フラグ](configuration/agent.md)は、Mesosエージェントの回復動作を制御します。
 
-## Agent Configuration
+* `strict`:エージェントのリカバリーをストリクトモードで行うかどうか [Default: true]
+  - strict=trueの場合、すべてのリカバリーエラーは致命的なものとみなされます。
+  - strict=falseの場合、リカバリー中のエラー（チェックポイントされたデータの破損など）は無視され、可能な限り多くの状態がリカバリーされます。
 
-Four [configuration flags](configuration/agent.md) control the recovery
-behavior of a Mesos agent:
+* `reconfiguration_policy`:復旧の際にどのような設定変更を受け入れるか [Default: equal]
+  - reconfiguration_policy=equalの場合は、設定変更を受け付けません。
+  - reconfiguration_policy=additiveの場合、エージェントは、新しい構成に追加の属性、リソースの増加、または追加のフォールトドメインを含めることを許可します。より詳細な説明については、[こちら](https://gitbox.apache.org/repos/asf?p=mesos.git;a=blob;f=src/slave/compatibility.hpp;h=78b421a01abe5d2178c93832577577a7ba282b38;hb=HEAD#l37)を参照してください。
 
-* `strict`: Whether to do agent recovery in strict mode [Default: true].
-    - If strict=true, all recovery errors are considered fatal.
-    - If strict=false, any errors (e.g., corruption in checkpointed data) during
-      recovery are ignored and as much state as possible is recovered.
+* `recover`: ステータスの更新を回復し、古いエグゼキューターと再接続するかどうか [Default: reconnect]
+    - recover=reconnectの場合、エグゼキューターのフレームワークがチェックポインティングを有効にしていれば、古い稼働中のエグゼキューターと再接続します。
+    - recover=cleanupの場合は、古い稼働中のエグゼキューターをすべてシャットダウンします。このオプションは、互換性のないエージェントやエクゼキュータのアップグレードを行う場合に使用してください。**注:**チェックポイント情報が存在しない場合、リカバリーは行われず、エージェントは新しいエージェントとしてマスターに登録されます。
 
-* `reconfiguration_policy`: Which kind of configuration changes are accepted
-  when trying to recover [Default: equal].
-    - If reconfiguration_policy=equal, no configuration changes are accepted.
-    - If reconfiguration_policy=additive, the agent will allow the new
-      configuration to contain additional attributes, increased resourced or an
-      additional fault domain. For a more detailed description, see
-      [this](https://gitbox.apache.org/repos/asf?p=mesos.git;a=blob;f=src/slave/compatibility.hpp;h=78b421a01abe5d2178c93832577577a7ba282b38;hb=HEAD#l37).
+* `recovery_timeout`: エージェントが回復するために割り当てられる時間 [Default: 15 mins].
+    - エージェントの復旧に `recovery_timeout` 以上の時間がかかった場合、エージェントへの再接続を待っていたエクゼキュータは自己終了します。**注:** どのフレームワークでもチェックポイントを有効にしていない場合、エージェントが死んだときに、エージェントで実行されているエクゼキュータとタスクは消滅し、回復しません。
 
-* `recover`: Whether to recover status updates and reconnect with old
-  executors [Default: reconnect]
-    - If recover=reconnect, reconnect with any old live executors, provided
-      the executor's framework enabled checkpointing.
-    - If recover=cleanup, kill any old live executors and exit. Use this
-      option when doing an incompatible agent or executor upgrade!
-      **NOTE:** If no checkpointing information exists, no recovery is performed
-      and the agent registers with the master as a new agent.
+再起動したエージェントは、タイムアウト(デフォルトでは75秒。[設定フラグ](configuration.md)の`--max_agent_ping_timeouts`および`--agent_ping_timeout`を参照)以内にマスターに再登録しなければなりません。エージェントの再登録にこのタイムアウト以上の時間がかかると、マスターはエージェントをシャットダウンし、その結果、実行中のエクゼキュータ/タスクもシャットダウンされます。
 
-* `recovery_timeout`: Amount of time allotted for the agent to
-  recover [Default: 15 mins].
-    - If the agent takes longer than `recovery_timeout` to recover, any
-      executors that are waiting to reconnect to the agent will self-terminate.
-      **NOTE:** If none of the frameworks have enabled checkpointing, the
-      executors and tasks running at an agent die when the agent dies and are
-      not recovered.
+したがって、[monit](http://mmonit.com/monit/)や`systemd`などのプロセス・スーパバイザを使用するなどして、エージェントの再起動プロセスを自動化することを強くお勧めします。
 
-A restarted agent should reregister with master within a timeout (75 seconds
-by default: see the `--max_agent_ping_timeouts` and `--agent_ping_timeout`
-[configuration flags](configuration.md)). If the agent takes longer than this
-timeout to reregister, the master shuts down the agent, which in turn will
-shutdown any live executors/tasks.
+## `systemd`とプロセスの寿命に関する既知の問題
 
-Therefore, it is highly recommended to automate the process of restarting an
-agent, e.g. using a process supervisor such as [monit](http://mmonit.com/monit/)
-or `systemd`.
+`systemd` を使用して `mesos-agent` を起動する際に、既知の問題があります。この問題の説明は [MESOS-3425](https://issues.apache.org/jira/browse/MESOS-3425) にあり、関連するすべての作業は [MESOS-3007](https://issues.apache.org/jira/browse/MESOS-3007) で追跡できます。
 
-## Known issues with `systemd` and process lifetime
+この問題は Mesos `0.25.0` の mesos containerizer で cgroups アイソレーションが有効な場合に修正されました。posix アイソレータと docker コ ンテナライザのさらなる修正は、`0.25.1`、`0.26.1`、`0.27.1`、`0.28.0` にあります。
 
-There is a known issue when using `systemd` to launch the `mesos-agent`. A
-description of the problem can be found in [MESOS-3425](https://issues.apache.org/jira/browse/MESOS-3425)
-and all relevant work can be tracked in the epic [MESOS-3007](https://issues.apache.org/jira/browse/MESOS-3007).
+`systemd` プロセスの [KillMode](http://www.freedesktop.org/software/systemd/man/systemd.kill.html) はデフォルトの `control-group` を使用することをお勧めします。これは、エージェントの停止時にすべての子プロセスをkillするものです。これにより、`fetcher` や `perf` などの「サイドカー」プロセスがエージェントと一緒に終了するようになります。Mesosのsystemdパッチでは、エグゼキュータとその子プロセスを別の `systemd` スライスに明示的に移動させ、エージェントからその寿命を切り離しています。これにより、エージェントの再起動後もエクゼキュータが存続するようになります。
 
-This problem was fixed in Mesos `0.25.0` for the mesos containerizer when
-cgroups isolation is enabled. Further fixes for the posix isolators and docker
-containerizer are available in `0.25.1`, `0.26.1`, `0.27.1`, and `0.28.0`.
-
-It is recommended that you use the default [KillMode](http://www.freedesktop.org/software/systemd/man/systemd.kill.html)
-for systemd processes, which is `control-group`, which kills all child processes
-when the agent stops. This ensures that "side-car" processes such as the
-`fetcher` and `perf` are terminated alongside the agent.
-The systemd patches for Mesos explicitly move executors and their children into
-a separate systemd slice, dissociating their lifetime from the agent. This
-ensures the executors survive agent restarts.
-
-The following excerpt of a `systemd` unit configuration file shows how to set
-the flag explicitly:
+次の例は、`systemd`ユニット設定ファイルの抜粋で、フラグを明示的に設定する方法を示しています。:
 
 ```
 [Service]

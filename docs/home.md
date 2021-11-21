@@ -21,7 +21,7 @@ layout: documentation
 * [高可用マスターのセットアップ](high-availability.md)
   * [ログのレプリケーション](replicated-log-internals.md) Mesosのレプリケーションされたログにおける情報
 * [耐障害性エージェントのセットアップ](agent-recovery.md)
-* [フレームワークの速度制限](framework-rate-limiting.md)
+* [フレームワーク速度制限](framework-rate-limiting.md)
 * [メンテナンス](maintenance.md) Mesosクラスターのメンテナンスのために
 * [アップグレード](upgrades.md) Mesosクラスターのアップグレード
 * [ダウングレード](downgrades.md) Mesosクラスターのダウングレード

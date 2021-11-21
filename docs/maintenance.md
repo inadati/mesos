@@ -3,52 +3,26 @@ title: Apache Mesos - Performing Maintenance
 layout: documentation
 ---
 
-# Performing Node Maintenance in a Mesos Cluster
+# Mesosクラスタでのノードメンテナンス
+オペレーターは、Mesosクラスタを構成するマシンのメンテナンスタスクを定期的に実行する必要があります。ほとんどのMesosのアップグレードは、実行中のタスクに影響を与えることなく行うことができますが、メンテナンスが実行中のタスクに影響を与える状況もあります。例えば、以下のようなものです。
 
-Operators regularly need to perform maintenance tasks on machines that comprise
-a Mesos cluster.  Most Mesos upgrades can be done without affecting running
-tasks, but there are situations where maintenance may affect running tasks.
-For example:
+* ハードウェアの修理
+* カーネルのアップグレード
+* エージェントのアップグレード（例：エージェントの属性やリソースの調整）
 
-* Hardware repair
-* Kernel upgrades
-* Agent upgrades (e.g., adjusting agent attributes or resources)
+Mesosクラスタ内のエージェントノードのメンテナンスを行う前に、一般的には、マシンが停止したときのサービスの中断を最小限に抑えるために、事前にノードからタスクをグレースマイグレーションすることが望ましいです。Mesosには、この移行を行うためのいくつかの方法があります。
 
-Before performing maintenance on an agent node in a Mesos cluster, it is
-typically desirable to gracefully migrate tasks away from the node beforehand in
-order to minimize service disruption when the machine is taken down. Mesos
-provides several ways to accomplish this migration:
+* `Automatic agent draining`: スケジューラの協力を明示的に必要としません。
+* `Manual node draining`: オペレータがタスク排水プロセスを正確に制御することができます。
+* `Maintenance primitives`: 複雑な調整を可能にするが、スケジューラが受け取ったメンテナンス関連のメッセージに対応する必要がある。
 
-* Automatic agent draining, which does not explicitly require cooperation from
-  schedulers
-* Manual node draining, which allows operators to exercise precise control over
-  the task draining process
-* Maintenance primitives, which permit complex coordination but do require that
-  schedulers react to the maintenance-related messages that they receive
+# `Automatic Node Draining`
+ノード・ドレインは、オペレータがメンテナンスを行う予定のノードからタスクをドレインするための簡単な方法を提供するために追加されました。この方法では、スケジューラがメンテナンス固有のメッセージのサポートを実装する必要はありません。
 
-# Automatic Node Draining
+ドレインを開始すると、対象となるエージェント・ノード上のすべてのタスクは、エージェントが現在到達可能であることを前提に、直ちにキル・イベントを受け取ります。エージェントが到達できない場合は、エージェントがマスターから再び到達できるようになるまで、キルイベントの開始が遅れます。タスクがkillイベントを受信すると、SIGTERMシグナルがタスクに送信され、kill処理が開始されます。タスクの動作によっては、この信号だけでタスクを終了させることができます。タスクによっては、このシグナルを使って、時間をかけてグレースフル・ターミネーションのプロセスを開始するものもあります。ある程度の遅延の後、SIGKILLシグナルがタスクに送信され、タスクがまだ実行中であれば強制的に終了させます。SIGTERMシグナルとSIGKILLシグナルの間の遅延は、タスクのkill grace periodの長さによって決まります。タスクに猶予期間が設定されていない場合は、数秒のデフォルト値が使用されます。
 
-Node draining was added to provide a simple method for operators to drain tasks
-from nodes on which they plan to perform maintenance, without requiring that
-schedulers implement support for any maintenance-specific messages.
-
-Initiating draining will cause all tasks on the target agent node to receive a
-kill event immediately, assuming the agent is currently reachable. If the agent
-is unreachable, initiation of the kill event will be delayed until the agent is
-reachable by the master again. When the tasks receive a kill event, a SIGTERM
-signal will be sent to the task to begin the killing process. Depending on the
-particular task's behavior, this signal may be sufficient to terminate it. Some
-tasks may use this signal to begin the process of graceful termination, which
-may take some time. After some delay, a SIGKILL signal will be sent to the task,
-which forcefully terminates the task if it is still running. The delay between
-the SIGTERM and SIGKILL signals is determined by the length of the task's kill
-grace period. If no grace period is set for the task, a default value of several
-seconds will be used.
-
-## Initiating Draining on a Node
-
-To begin draining an agent, issue the operator API [`DRAIN_AGENT`
-call](operator-http-api.md#drain_agent) to the master:
+## ノードでのドレインを開始する
+エージェントのドレインを開始するには、マスターに対してoperator API [DRAIN_AGENTコール](operator-http-api.md#drain_agent)を発行します。:
 
     $ curl -X POST -d '{"type": "DRAIN_AGENT", "drain_agent": {"agent_id": {"value": "<mesos-agent-id>"}}}' masterhost:5050/api/v1
 

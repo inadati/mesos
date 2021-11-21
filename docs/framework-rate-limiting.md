@@ -3,16 +3,16 @@ title: Apache Mesos - Framework Rate Limiting
 layout: documentation
 ---
 
-# Framework Rate Limiting
-Framework rate limiting is a feature introduced in Mesos 0.20.0.
+# フレームワーク速度制限
+フレームワークレートの制限は、Mesos 0.20.0で導入された機能です。
 
-## What is Framework Rate Limiting
-In a multi-framework environment, this feature aims to protect the throughput of high-SLA (e.g., production, service) frameworks by having the master throttle messages from other (e.g., development, batch) frameworks.
+## フレームワーク速度制限とは
+この機能は、マルチフレームワーク環境において、マスターが他のフレームワーク（例：開発、バッチ）からのメッセージをスロットルすることで、HLAの高いフレームワーク（例：プロダクション、サービス）のスループットを保護することを目的としています。
 
-To throttle messages from a framework, the Mesos cluster operator sets a `qps` (queries per seconds) value for each framework identified by its principal (You can also throttle a group of frameworks together but we'll assume individual frameworks in this doc unless otherwise stated; see the `RateLimits` [Protobuf definition](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto) and the configuration notes below). The master then promises not to process messages from that framework at a rate above `qps`. The outstanding messages are stored in memory on the master.
+フレームワークからのメッセージをスロットルするには、Mesosクラスタのオペレータが、プリンシパルによって特定される各フレームワークに`qps`（queries per seconds）値を設定します（フレームワークのグループをまとめてスロットルすることもできますが、このドキュメントでは特に断りがない限り個々のフレームワークを想定しています：以下の`RateLimits` [Protobufの定義](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto)と設定上の注意を参照してください）。マスターは、そのフレームワークからのメッセージを`qps`以上のレートで処理しないことを約束します。未処理のメッセージはマスターのメモリに保存されます。
 
-## Rate Limits Configuration
-The following is a sample config file (in JSON format) which could be specified with the `--rate_limits` master flag.
+## 速度制限の設定
+以下は、`--rate_limits` masterフラグで指定可能な設定ファイルのサンプル（JSON形式）です。
 
     {
       "limits": [
@@ -33,42 +33,39 @@ The following is a sample config file (in JSON format) which could be specified 
       "aggregate_default_capacity": 1000000
     }
 
-In this example, framework `foo` is throttled at the configured `qps` and `capacity`, framework `bar` is given unlimited capacity and framework `baz` is not throttled at all. If there is a fourth framework `qux` or a framework without a principal connected to the master, it is throttled by the rules `aggregate_default_qps` and `aggregate_default_capacity`.
+この例では、フレームワーク `foo` は設定された `qps` と容量でスロットルされ、フレームワーク `bar` は無制限の`capacity`が与えられ、フレームワーク `baz` はまったくスロットルされません。もし、マスターに4番目のフレームワーク `qux` やプリンシパルのいないフレームワークが接続されている場合は、 `aggregate_default_qps` と `aggregate_default_capacity` というルールでスロットルがかけられます。
 
-### Configuration Notes
-Below are the fields in the JSON configuration.
+### 設定上の注意
+以下は、JSON構成のフィールドです。
 
-- **principal**: (Required) uniquely identifies the entity being throttled or given unlimited rate explicitly.
-    - It should match the framework's `FrameworkInfo.principal` (See [definition](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto)).
-    - You can have multiple frameworks use the same principal (e.g., some Mesos frameworks launch a new framework instance for each job), in which case the combined traffic from all frameworks using the same principal are throttled at the specified QPS.
-- **qps**: (Optional) queries per second, i.e., the rate.
-    - Once set, the master guarantees that it does not process messages from this principal higher than this rate. However the master could be slower than this rate, especially if the specified rate is too high.
-    - To explicitly give a framework unlimited rate (i.e., not throttling it), add an entry to `limits` without the qps.
-- **capacity**: (Optional) The number of *outstanding* messages frameworks of this principal can put on the master. If not specified, this principal is given unlimited capacity. Note that it is possible the queued messages use too much memory and cause the master to OOM if the capacity is set too high or not set.
-    - NOTE: If `qps` is not specified, `capacity` is ignored.
-- Use **aggregate_default_qps** and **aggregate_default_capacity** to safeguard the master from unspecified frameworks. All the frameworks not specified in `limits` get this default rate and capacity.
-    - The rate and capacity are aggregate values for all of them, i.e., their combined traffic is throttled together.
-    - Same as above, if `aggregate_default_qps` is not specified, `aggregate_default_capacity` is ignored.
-    - If these fields are not present, the unspecified frameworks are not throttled.
-      This is an implicit way of giving frameworks unlimited rate compared to the explicit way above (using an entry in `limits` with only the principal).
-      We recommend using the explicit option especially when the master does not require authentication to prevent unexpected frameworks from overwhelming the master.
+- **principal**: (必須) 絞り込みまたは無制限レートを明示的に与えられているエンティティを一意に識別します。
+    - フレームワークの`FrameworkInfo.principal`（[定義](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto)参照）と一致する必要があります。
+    - 複数のフレームワークが同じプリンシパルを使用することができますが（例えば、Mesosフレームワークの中には、ジョブごとに新しいフレームワークインスタンスを起動するものがあります）、その場合、同じプリンシパルを使用するすべてのフレームワークからのトラフィックを合計すると、指定されたQPSでスロットルされます。
+- **qps**: (オプション) 1秒あたりのクエリ数、つまりレートです。
+    - 一度設定されると、マスターは、このプリンシパルからのメッセージをこのレートよりも高く処理しないことを保証します。しかし、特に指定されたレートが高すぎる場合には、マスターはこのレートよりも遅くなる可能性があります。
+    - フレームワークに無制限のレートを明示的に与える（つまり、スロットルをかけない）には、qpsを除いた`limits`にエントリを追加します。
+- **capacity**: (オプション) このプリンシパルのフレームワークがマスターにかけることができる未処理メッセージの数です。指定されていない場合、このプリンシパルには無制限の容量が与えられます。容量の設定が高すぎたり、設定されていない場合、キューに入れられたメッセージがメモリを使いすぎて、マスターがOOMになる可能性があることに注意してください。
+    - 注: `qps`が指定されていない場合、`capacity`は無視されます。
+- **aggregate_default_qps** および **aggregate_default_capacity** を使用して、指定されていないフレームワークからマスターを保護します。`limits`で指定されていないフレームワークはすべて、このデフォルトレートとキャパシティを取得します。
+    - レートとキャパシティは、すべての人のための集約された値であり、つまり、それらを合わせたトラフィックが一緒にスロットルされます。
+    - 上記と同様に、`aggregate_default_qps`が指定されていない場合、`aggregate_default_capacity`は無視されます。
+    - これらのフィールドが存在しない場合、指定されていないフレームワークはスロットルされません。これは、上記の明示的な方法 (プリンシパルのみの`limits`のエントリを使用する) と比較して、フレームワークに無制限のレートを与える暗黙の方法です。特にマスターが認証を必要としない場合は、想定外のフレームワークがマスターを圧迫するのを防ぐため、明示的なオプションの使用をお勧めします。
 
-## Using Framework Rate Limiting
+## フレームワーク速度制限の使用
 
-### Monitoring Framework Traffic
-While a framework is registered with the master, the master exposes counters for all messages received and processed from that framework at its metrics endpoint: `http://<master>/metrics/snapshot`. For instance, framework `foo` has two message counters `frameworks/foo/messages_received` and `frameworks/foo/messages_processed`. Without framework rate limiting the two numbers should differ by little or none (because messages are processed ASAP) but when a framework is being throttled the difference indicates the outstanding messages as a result of the throttling.
+### フレームワーク トラフィックの監視
+フレームワークがマスターに登録されている間、マスターはそのフレームワークから受信したすべてのメッセージと処理されたメッセージのカウンターをメトリクス・エンドポイント`http://<master>/metrics/snapshot`で公開します。例えば、フレームワーク`foo`は2つのメッセージカウンタ`frameworks/foo/messages_received`と`frameworks/foo/messages_processed`を持っています。フレームワークのレート制限がない場合、この2つの数値の差はほとんどないはずですが（メッセージはすぐに処理されるため）、フレームワークがスロットルされている場合、その差はスロットルの結果としての未処理メッセージを示しています。
 
-By continuously monitoring the counters, you can derive the rate messages arrive and how fast the message queue length for the framework is growing (if it is throttled). This should depict the characteristics of the framework in terms of network traffic.
+カウンタを継続的に監視することで、メッセージが到着する割合や、フレームワークのメッセージキューの長さがどれくらい速くなっているかを導き出すことができます（スロットルがかかっている場合）。これは、ネットワーク・トラフィックの観点から見たフレームワークの特性を示すものです。
 
-## Configuring Rate Limits
-Since the goal for framework rate limiting is to prevent low-SLA frameworks from using **too much** resources and not to model their traffic and behavior as precisely as possible, you can start by using large `qps` values to throttle them. The fact that they are throttled (regardless of the configured `qps`) is already effective in giving messages from high-SLA frameworks higher priority because they are processed ASAP.
+## 速度制限の設定をする
+フレームワークのレート制限の目的は、低SLAフレームワークがリソースを使いすぎないようにすることであり、フレームワークのトラフィックや動作を可能な限り正確にモデル化することではないため、大きな`qps`値を使ってスロットルすることから始めることができます。設定された`qps`に関わらず）スロットルされているという事実は、高SLAフレームワークからのメッセージが早急に処理されるため、より高い優先度を与えるという点ですでに効果的です。
 
-To calculate how much `capacity` the master can handle, you need to know the memory limit for the master process, the amount of memory it typically uses to serve similar workload without rate limiting (e.g., use `ps -o rss $MASTER_PID`) and average sizes of the framework messages (queued messages are stored as [serialized Protocol Buffers with a few additional fields](https://github.com/apache/mesos/blob/master/3rdparty/libprocess/include/process/message.hpp)) and you should sum up all capacity values in the config.
-However since this kind of calculation is imprecise, you should start with small values that tolerate reasonable temporary framework burstiness but far from the memory limit to leave enough headroom for the master and frameworks that don't have limited capacity.
+マスターが処理できる`capacity`を計算するには、マスタープロセスのメモリ制限、レート制限をかけずに同様のワークロードを処理する際に通常使用するメモリ量（`ps -o rss $MASTER_PID`などを使用）、フレームワークのメッセージの平均サイズ（キューイングされたメッセージは、[いくつかのフィールドを追加したシリアル化されたProtocol Buffer](https://github.com/apache/mesos/blob/master/3rdparty/libprocess/include/process/message.hpp)として保存されます）を知り、設定ですべての容量値を合計する必要があります。しかし、この種の計算は不正確なので、一時的なフレームワークのバーストを許容する小さな値から始めるべきですが、マスターと容量が制限されていないフレームワークのために十分な余裕を残しておくために、メモリ制限からは離れています。
 
-## Handling "Capacity Exceeded" Error
-When a framework **exceeds the capacity**, a FrameworkErrorMessage is sent back to the framework which will [abort the scheduler driver and invoke the error() callback](https://github.com/apache/mesos/blob/master/src/sched/sched.cpp). It doesn't kill any tasks or the scheduler itself. The framework developer can choose to restart or failover the scheduler instance to remedy the consequences of dropped messages (unless your framework doesn't assume all messages sent to the master are processed).
+## 容量超過エラーの処理
+フレームワークが**容量を超えると**、FrameworkErrorMessageがフレームワークに送り返され、[スケジューラドライバを中止し、error()コールバック](https://github.com/apache/mesos/blob/master/src/sched/sched.cpp)を呼び出します。これは、タスクやスケジューラ自体を殺すものではありません。フレームワークの開発者は、ドロップされたメッセージの結果を改善するために、スケジューラのインスタンスを再起動またはフェイルオーバーすることを選択できます（フレームワークがマスターに送信されたすべてのメッセージが処理されることを想定していない場合）。
 
-After version 0.20.0 we are going to iterate on this feature by having the master send an early alert when the message queue for this framework **starts to build up** ([MESOS-1664](https://issues.apache.org/jira/browse/MESOS-1664), consider it a "soft limit"). The scheduler can react by throttling itself (to avoid the error message) or ignoring this alert if it's a temporary burst by design.
+バージョン0.20.0以降では、このフレームワークのメッセージキューが**構築され始めたとき**（[MESOS-1664](https://issues.apache.org/jira/browse/MESOS-1664)、"ソフトリミット "と考えてください）、マスターが早期にアラートを送信することで、この機能を繰り返し使用する予定です。スケジューラは、（エラーメッセージを回避するために）自分自身をスロットルするか、設計上の一時的なバーストであれば、このアラートを無視することで対応できます。
 
-Before the early alerting is implemented we **don't recommend using the rate limiting feature to throttle production frameworks** for now unless you are sure about the consequences of the error message. Of course it's OK to use it to protect production frameworks by throttling other frameworks and it doesn't have any effect on the master if it's not explicitly enabled.
+早期警告が実装される前に、エラーメッセージの結果について確信が持てない限り、**今のところレート制限機能を使って本番フレームワークをスロットルすることはお勧めしません。** もちろん、他のフレームワークをスロットルして本番フレームワークを保護するために使用することは問題ありませんし、明示的に有効になっていない場合はマスターに何の影響も与えません。

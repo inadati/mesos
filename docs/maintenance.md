@@ -13,7 +13,7 @@ layout: documentation
 Mesosクラスタ内のエージェントノードのメンテナンスを行う前に、一般的には、マシンが停止したときのサービスの中断を最小限に抑えるために、事前にノードからタスクをグレースマイグレーションすることが望ましいです。Mesosには、この移行を行うためのいくつかの方法があります。
 
 * `Automatic agent draining`: スケジューラの協力を明示的に必要としません。
-* `Manual node draining`: オペレータがタスク排水プロセスを正確に制御することができます。
+* `Manual node draining`: オペレータがタスクドレインプロセスを正確に制御することができます。
 * `Maintenance primitives`: 複雑な調整を可能にするが、スケジューラが受け取ったメンテナンス関連のメッセージに対応する必要がある。
 
 # `Automatic Node Draining`

@@ -26,175 +26,88 @@ Mesosクラスタ内のエージェントノードのメンテナンスを行う
 
     $ curl -X POST -d '{"type": "DRAIN_AGENT", "drain_agent": {"agent_id": {"value": "<mesos-agent-id>"}}}' masterhost:5050/api/v1
 
-This will immediately begin the process of killing all tasks on the agent. Once
-draining has begun, it cannot be cancelled. To monitor the progress of the
-draining process, you can inspect the state of the agent via the master operator
-API [`GET_STATE`](operator-http-api.md#get_state) or
-[`GET_AGENTS`](operator-http-api.md#get_agents) calls:
+これにより、エージェントのすべてのタスクを停止する処理が直ちに開始されます。一度開始されたドレイン処理はキャンセルできません。ドレイン処理の進行状況を監視するには、マスター・オペレーターAPIの[`GET_STATE`](operator-http-api.md#get_state)または[`GET_AGENTS`](operator-http-api.md#get_agents)コールでエージェントの状態を調べることができます。:
 
     $ curl -X POST -d '{"type": "GET_AGENTS"}' masterhost:5050/api/v1
 
-Locate the relevant agent and inspect its `drain_info.state` field. While
-draining, the state will be `DRAINING`. When all tasks on the agent have
-terminated, all their terminal status updates have been acknowledged by the
-schedulers, and all offer operations on the agent have finished, draining is
-complete and the agent's drain state will transition to `DRAINED`. At this
-point, the node may be taken down for maintenance.
+関連するエージェントを見つけ、その `drain_info.state` フィールドを検査します。ドレイン中、状態は`DRAINING`になります。エージェント上のすべてのタスクが終了し、それらのすべてのターミナル・ステータス・アップデートがスケジューラによって承認され、エージェント上のすべてのオファー操作が終了すると、ドレインが完了し、エージェントのドレイン状態は`DRAINED`に移行します。この時点で、ノードはメンテナンスのために停止することができます。
 
-## Options for Automatic Node Draining
-
-You may set an upper bound on the kill grace period of draining tasks by
-specifying the `max_grace_period` option when draining:
+## 自動ノードドレインのオプション
+ドレインの際に`max_grace_period`オプションを指定することで、ドレインタスクのキルグレース期間に上限を設定することができます。:
 
     $ curl -X POST -d '{"type": "DRAIN_AGENT", "drain_agent": {"agent_id": {"value": "<mesos-agent-id>"}, "max_grace_period": "10mins"}}' masterhost:5050/api/v1
 
-In cases where you know that the node being drained will not return after
-draining is complete, and you would like it to be automatically permanently
-removed from the cluster, you may specify the `mark_gone` option:
+ドレイン中のノードがドレイン完了後に戻ってこないことがわかっていて、そのノードを自動的にクラスタから永久に削除したい場合は、`mark_gone`オプションを指定することができます。:
 
     $ curl -X POST -d '{"type": "DRAIN_AGENT", "drain_agent": {"agent_id": {"value": "<mesos-agent-id>"}, "mark_gone": true}}' masterhost:5050/api/v1
 
-This can be useful, for example, in the case of autoscaled cloud instances,
-where an instance is being scaled down and will never return. This is equivalent
-to issuing the [`MARK_AGENT_GONE`](operator-http-api.md#mark_agent_gone) call on
-the agent immediately after it finishes draining. WARNING: draining with the
-`mark_gone` option is irreversible, and results in the loss of all local
-persistent data on the agent node. Use this option with caution!
+これは、例えば、オートスケールされたクラウドインスタンスの場合、インスタンスがスケールダウンされ、二度と戻ってこないような場合に役立ちます。これは、エージェントのドレインが終了した直後に[`MARK_AGENT_GONE`](operator-http-api.md#mark_agent_gone)コールを発行することと同じです。警告：`mark_gone`オプションを使用したドレインは不可逆的であり、エージェントノード上のすべてのローカル永続的データが失われます。このオプションの使用には注意が必要です。
 
-## Reactivating a Node After Maintenance
+## メンテナンス後のノードの再起動
 
-Once maintenance on an agent is complete, it must be reactivated so that it can
-reregister with the master and rejoin the cluster. You may use the master
-operator API [`REACTIVATE_AGENT`](operator-http-api.md#reactivate_agent) call to
-accomplish this:
+エージェントのメンテナンスが完了したら、マスターに再登録してクラスタに再参加できるように、エージェントを再起動する必要があります。これを行うには、マスター・オペレーターAPIの[`REACTIVATE_AGENT`](operator-http-api.md#reactivate_agent)コールを使用できます。:
 
     $ curl -X POST -d '{"type": "REACTIVATE_AGENT", "reactivate_agent": {"agent_id": {"value": "<mesos-agent-id>"}}}' masterhost:5050/api/v1
 
-# Manual Node Draining
+# `Manual Node Draining`
 
-If you require greater control over the draining process, you may be able to
-drain the agent manually using both the Mesos operator API as well as APIs
-exposed by the schedulers running tasks on the agent.
+ドレインプロセスをより細かく制御する必要がある場合は、Mesos オペレータ API と、エージェント上でタスクを実行しているスケジューラが公開している API の両方を使用して、エージェントを手動でドレインすることができます。
 
-## Deactivating an Agent
+## エージェントの無効化
 
-The first step in the manual draining process is agent deactivation, which
-prevents new tasks from launching on the target agent:
+手動ドレイン処理の最初のステップは、対象となるエージェントで新しいタスクが起動しないようにするエージェントの無効化です。:
 
     $ curl -X POST -d '{"type": "DEACTIVATE_AGENT", "deactivate_agent": {"agent_id": {"value": "<mesos-agent-id>"}}}' masterhost:5050/api/v1
 
-If you receive a `200 OK` response, then the agent has been deactivated. You can
-confirm the deactivation state of any agent by inspecting its `deactivated`
-field in the response of the master operator API
-[`GET_STATE`](operator-http-api.md#get_state) or
-[`GET_AGENTS`](operator-http-api.md#get_agents) calls. Once the agent is
-deactivated, you can use the APIs exposed by the schedulers responsible for the
-tasks running on the agent to kill those tasks manually. To verify that all
-tasks on the agent have terminated and their terminal status updates have been
-acknowledged by the schedulers, ensure that the `pending_tasks`, `queued_tasks`,
-and `launched_tasks` fields in the response to the
-[`GET_TASKS`](operator-http-api.md#get_tasks-1) agent operator API call are
-empty:
+`200 OK` レスポンスを受け取った場合、エージェントは非活性化されています。エージェントの非活性化状態は、マスター・オペレーターAPIの[`GET_STATE`](operator-http-api.md#get_state)または[`GET_AGENTS`](operator-http-api.md#get_agents)コールのレスポンスにある`deactivated`フィールドを確認することで確認することができます。エージェントが非活性化されると、エージェント上で実行されているタスクを担当するスケジューラが公開している API を使用して、それらのタスクを手動で強制終了することができます。エージェント上のすべてのタスクが終了し、それらのターミナル・ステータス・アップデートがスケジューラによって認識されたことを確認するには、[`GET_TASKS`](operator-http-api.md#get_tasks-1) エージェント・オペレータ API コールに対するレスポンスの `pending_tasks`、`queued_tasks`、および `launched_tasks` フィールドが空であることを確認します。:
 
     $ curl -X POST -d '{"type": "GET_TASKS"}' agenthost:5051/api/v1
 
-If you are making use of volumes backed by network storage on the target agent,
-it's possible that there may be a long-running offer operation on the agent
-which has not yet finished. To check if this is the case, issue the agent
-operator API [`GET_OPERATIONS`](operator-http-api.md#get_operations-1) call to
-the agent:
+ターゲットエージェント上のネットワークストレージでバックアップされたボリュームを使用している場合、エージェント上で長時間実行されているオファー操作がまだ終了していない可能性があります。これを確認するには、エージェントに対してエージェントオペレータAPIの[`GET_OPERATIONS`](operator-http-api.md#get_operations-1)コールを発行します。:
 
     $ curl -X POST -d '{"type": "GET_OPERATIONS"}' agenthost:5051/api/v1
 
-If any operations have a `latest_status` with a state of `OPERATION_PENDING`,
-you should wait for them to finish before taking down the node. Unfortunately,
-it is not possible to cancel or forcefully terminate such storage operations. If
-such an operation becomes stuck in the pending state, you should inspect the
-relevant storage backend for any issues.
+`latest_status`に`OPERATION_PENDING`が指定されている操作がある場合は、その操作が終了するのを待ってからノードを停止する必要があります。残念ながら、このようなストレージ操作をキャンセルしたり強制的に終了させたりすることはできません。このような操作が保留状態で止まってしまった場合は、関連するストレージバックエンドに問題がないか検査する必要があります。
 
-Once all tasks on the agent have terminated and all offer operations are
-finished, the node may be taken down for maintenance. Once maintenance is
-complete, the procedure for reactivating the node is the same as that detailed
-in the section on automatic node draining.
+エージェント上のすべてのタスクが終了し、すべてのオファー操作が終了すると、メンテナンスのためにノードを停止することができます。メンテナンスが完了したら、ノードを再起動する手順は、ノードの`Automatic Node Draining`のセクションで説明したものと同じです。
 
-# Maintenance Primitives
+# `Maintenance Primitives`
 
-Frameworks require visibility into any actions that disrupt cluster operation
-in order to meet Service Level Agreements or to ensure uninterrupted services
-for their end users.  Therefore, to reconcile the requirements of frameworks
-and operators, frameworks must be aware of planned maintenance events and
-operators must be aware of frameworks' ability to adapt to maintenance.
-Maintenance primitives add a layer to facilitate communication between the
-frameworks and operator.
+フレームワークは、サービスレベルアグリーメントを満たすため、またはエンドユーザーにサービスを中断させないために、クラスターの運用を中断させる行為を可視化する必要があります。したがって、フレームワークとオペレータの要求を両立させるためには、フレームワークは計画されたメンテナンスイベントを認識し、オペレータはフレームワークのメンテナンスへの適応能力を認識する必要があります。メンテナンスプリミティブは、フレームワークとオペレータの間のコミュニケーションを促進するためのレイヤーを追加します。
 
-## Terminology
+## 用語の解説
 
-For the purpose of this section, an "Operator" is a person, tool, or script
-that manages a Mesos cluster.
+このセクションでは、「オペレーター」とは、Mesosクラスタを管理する人、ツール、またはスクリプトのことです。
 
-Maintenance primitives add several new concepts to Mesos. Those concepts are:
+Maintenance primitivesは、Mesosにいくつかの新しい概念を追加します。それらの概念は:
 
-* **Maintenance**: An operation that makes resources on a machine unavailable,
-  either temporarily or permanently.
-* **Maintenance window**: A set of machines and an associated time interval during
-  which some maintenance is planned on those machines.
-* **Maintenance schedule**: A list of maintenance windows.
-  A single machine may only appear in a schedule once.
-* **Unavailability**: An operator-specified interval, defined by a start time
-  and duration, during which an associated machine may become unavailable.
-  In general, no assumptions should be made about the availability of the
-  machine (or resources) after the unavailability.
-* **Drain**: An interval between the scheduling of maintenance and when the
-  machine(s) become unavailable.  Offers sent with resources from draining
-  machines will contain unavailability information.  Frameworks running on
-  draining machines will receive inverse offers (see next).  Frameworks
-  utilizing resources on affected machines are expected either to take
-  preemptive steps to prepare for the unavailability; or to communicate the
-  framework's inability to conform to the maintenance schedule.
-* **Inverse offer**: A communication mechanism for the master to ask for
-  resources back from a framework.  This notifies frameworks about any
-  unavailability and gives frameworks a mechanism to respond about their
-  ability to comply.  Inverse offers are similar to offers in that they
-  can be accepted, declined, re-offered, and rescinded.
+* **Maintenance**: マシン上のリソースを一時的または恒久的に利用できなくする操作のこと。
+* **Maintenance window**: 一連のマシンと、それらのマシンに対して何らかのメンテナンスが計画されている時間間隔。
+* **Maintenance schedule**: メンテナンスウィンドウのリストです。1台のマシンがスケジュールに表示されるのは1回だけです。
+* **Unavailability**: 関連するマシンが利用できなくなる可能性のある、開始時間と継続時間によって定義される、オペレータが指定した間隔。一般的に、利用不能になった後のマシン（またはリソース）の利用可能性については仮定してはならない。
+* **Drain**: メンテナンスが予定されてから、マシンが利用できなくなるまでの間隔。ドレインされたマシンのリソースを使って送られたオファーには、使用不能の情報が含まれます。ドレインされたマシン上で稼働しているフレームワークは、逆のオファーを受け取ることになります（次項参照）。影響を受けるマシンのリソースを利用しているフレームワークは、利用不能に備えて先手を打つか、フレームワークがメンテナンススケジュールに従えないことを伝えることが期待されます。
+* **Inverse offer**: マスターがフレームワークにリソースの返却を求めるための通信メカニズム。これにより、利用できない場合はフレームワークに通知され、フレームワークはそれに応じることができるかどうかを回答するためのメカニズムが与えられます。逆オファーは、オファーと同様に、受け入れ、拒否し、再オファーし、取り消すことができます。
 
-**Note**: Unavailability and inverse offers are not specific to maintenance.
-The same concepts can be used for non-maintenance goals, such as reallocating
-resources or resource preemption.
+**注:** アンアベイラビリティとインバースオファーは、メンテナンスに特有のものではありません。同じコンセプトは、リソースの再割り当てやリソースの先取りなど、メンテナンス以外の目的にも使用することができます。
 
-## How does it work?
-
-Maintenance primitives were introduced in Mesos 0.25.0.  Several machine
-maintenance modes were also introduced.  Those modes are illustrated below.
+## どのような仕組みになっているのでしょうか？
+Mesos 0.25.0で`Maintenance primitives`が導入されました。また、いくつかのマシンメンテナンスモードが導入されました。それらのモードを以下に説明します。
 
 ![Maintenance mode transitions](images/maintenance-primitives-modes.png)
 
-All mode transitions must be initiated by the operator.  Mesos will not
-change the mode of any machine, regardless of the estimate provided in
-the maintenance schedule.
+すべてのモード移行は、オペレータが開始する必要があります。Mesosは、メンテナンススケジュールで提示された見積もりに関わらず、どのマシンのモードも変更しません。
 
-### Scheduling maintenance
+### メンテナンスのスケジューリング
 
-A machine is transitioned from Up mode to Draining mode as soon as it is
-scheduled for maintenance.  To transition a machine into Draining mode, an
-operator constructs a maintenance schedule as a JSON document and posts it to
-the [/maintenance/schedule](endpoints/master/maintenance/schedule.md) HTTP
-endpoint on the Mesos master. Each Mesos cluster has a single maintenance
-schedule; posting a new schedule replaces the previous schedule, if any.
+マシンは、メンテナンスが予定されるとすぐにUpモードからDrainingモードに移行します。マシンをDrainingモードに移行させるために、オペレーターはメンテナンススケジュールをJSONドキュメントとして作成し、Mesosマスターの[/maintenance/schedule](endpoints/master/maintenance/schedule.md) HTTPエンドポイントに投稿します。各Mesosクラスターには1つのメンテナンススケジュールがあり、新しいスケジュールを投稿すると、以前のスケジュールがある場合は置き換えられます。
 
-See the definition of a [maintenance::Schedule](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/maintenance/maintenance.proto#L48-L67)
-and of [Unavailability](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/v1/mesos.proto#L140-L154).
+[maintenance::Schedule](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/maintenance/maintenance.proto#L48-L67)の定義と[Unavailability](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/v1/mesos.proto#L140-L154)の定義を参照してください。
 
-In a production environment, the schedule should be constructed to ensure that
-enough agents are operational at any given point in time to ensure
-uninterrupted service by the frameworks.
+本番環境では、フレームワークによるサービスが中断されないように、任意の時点で十分な数のエージェントが稼働するようにスケジュールを構築する必要があります。
 
-For example, in a cluster of three machines, the operator might schedule two
-machines for one hour of maintenance, followed by another hour for the last
-machine.  The timestamps for unavailability are expressed in nanoseconds since
-the Unix epoch (note that making reliable use of maintenance primitives requires
-that the system clocks of all machines in the cluster are roughly synchronized).
+例えば、3台のマシンからなるクラスタの場合、オペレータは2台のマシンに1時間のメンテナンスを行い、最後のマシンにはさらに1時間のメンテナンスを行うようにスケジュールすることができます。使用不可のタイムスタンプはUnixエポックからのナノ秒で表されます（メンテナンスプリミティブを確実に使用するには、クラスタ内のすべてのマシンのシステムクロックがほぼ同期している必要があることに注意してください）。
 
-The schedule might look like:
+スケジュールは以下のようになります。:
 
 ```
 {
@@ -220,9 +133,7 @@ The schedule might look like:
   ]
 }
 ```
-
-The operator can then post the schedule to the master's
-[/maintenance/schedule](endpoints/master/maintenance/schedule.md) endpoint:
+オペレーターは、マスターの[/maintenance/schedule](endpoints/master/maintenance/schedule.md)エンドポイントにスケジュールを投稿することができます。:
 
 ```
 curl http://localhost:5050/maintenance/schedule \
@@ -231,105 +142,49 @@ curl http://localhost:5050/maintenance/schedule \
   -d @schedule.json
 ```
 
-The machines in a maintenance schedule do not need to be registered with the
-Mesos master at the time when the schedule is set.  The operator may add a
-machine to the maintenance schedule prior to launching an agent on the machine.
-For example, this can be useful to prevent a faulty machine from launching an
-agent on boot.
+メンテナンススケジュールに登録されているマシンは、スケジュール設定時にMesosマスターに登録されている必要はありません。オペレータは、マシン上でエージェントを起動する前に、マシンをメンテナンス・スケジュールに追加することができる。例えば、故障したマシンが起動時にエージェントを起動するのを防ぐのに有効である。
 
-**Note**: Each machine in the maintenance schedule should have as
-complete information as possible.  In order for Mesos to recognize an agent
-as coming from a particular machine, both the `hostname` and `ip` fields must
-match.  Any omitted data defaults to the empty string `""`.  If there are
-multiple hostnames or IPs for a machine, the machine's fields need to match
-what the agent announces to the master.  If there is any ambiguity in a
-machine's configuration, the operator should use the `--hostname` and `--ip`
-options when starting agents.
+**注:** メンテナンススケジュールの各マシンには、できるだけ完全な情報が必要です。Mesosがエージェントを特定のマシンからのものと認識するためには、`hostname`と`ip`の両フィールドが一致する必要がある。省略されたデータは、空の文字列「"」がデフォルトとなります。1 台のマシンに複数のホスト名または IP がある場合、マシンのフィールドは、エージェントがマスターにアナウンスする内容と一致している必要があります。マシンの設定に曖昧さがある場合、オペレータはエージェントの起動時に`--hostname`および`--ip`オプションを使用する必要がある。
 
-The master checks that a maintenance schedule has the following properties:
+マスターは、メンテナンススケジュールが以下のプロパティを持つことをチェックする。:
 
-* Each maintenance window in the schedule must have at least one machine
-  and a specified unavailability interval.
-* Each machine must only appear in the schedule once.
-* Each machine must have at least a hostname or IP included.
-  The hostname is not case-sensitive.
-* All machines that are in Down mode must be present in the schedule.
-  This is required because this endpoint does not handle the transition
-  from Down mode to Up mode.
+* スケジュールの各メンテナンスウィンドウには、少なくとも1台のマシンと指定された使用不可期間が必要です。
+* 各マシンは、スケジュールに一度だけ表示されなければならない。
+* 各マシンには、少なくともホスト名またはIPが含まれていなければならない。ホスト名は大文字と小文字を区別しない。
+* ダウンモードにあるすべてのマシンがスケジュールに含まれていなければならない。これは、このエンドポイントがDownモードからUpモードへの移行を処理しないために必要である。
 
-If any of these properties are not met, the maintenance schedule is rejected
-with a corresponding error message and the master's state is not changed.
+これらのプロパティのいずれかが満たされていない場合、メンテナンススケジュールは、対応するエラーメッセージとともに拒否され、マスターの状態は変更されません。
 
-To update the maintenance schedule, the operator should first read the current
-schedule, make any necessary changes, and then post the modified schedule. The
-current maintenance schedule can be obtained by sending a GET request to the
-master's `/maintenance/schedule` endpoint.
+メンテナンス・スケジュールを更新するには、オペレーターはまず現在のスケジュールを読み、必要な変更を加えた後、変更後のスケジュールを投稿する必要があります。現在のメンテナンススケジュールは、マスターの`/maintenance/schedule`エンドポイントにGETリクエストを送信することで取得できます。
 
-To cancel the maintenance schedule, the operator should post an empty schedule.
+メンテナンス・スケジュールをキャンセルするには、オペレータは空のスケジュールを投稿する必要があります。
 
-### Draining mode
+### ドレインモード
 
-As soon as a schedule is posted to the Mesos master, the following things occur:
+スケジュールがMesos masterに投稿されると、次のようなことが起こります。:
 
-* The schedule is stored in the [replicated log](replicated-log-internals.md).
-  This means the schedule is persisted in case of master failover.
-* All machines in the schedule are immediately transitioned into Draining
-  mode.  The mode of each machine is also persisted in the replicated log.
-* All frameworks using resources on affected agents are immediately
-  notified.  Existing offers from the affected agents are rescinded
-  and re-sent with additional unavailability data.  All frameworks using
-  resources from the affected agents are given inverse offers.
-* New offers from the affected agents will also include
-  the additional unavailability data.
+* スケジュールは[replicated log](replicated-log-internals.md)に保存されます。これは、マスターがフェイルオーバーした場合でも、スケジュールが持続されることを意味します。
+* スケジュールに含まれるすべてのマシンは、即座にDrainingモードに移行します。各マシンのモードもレプリケートされたログに保存されます。
+* 影響を受けたエージェントのリソースを使用しているすべてのフレームワークに、直ちに通知されます。影響を受けたエージェントからの既存のオファーは取り消され、利用できないデータを追加して再送信されます。影響を受けたエージェントのリソースを使用しているすべてのフレームワークには、逆のオファーが与えられます。
+* 影響を受けたエージェントからの新しいオファーには、追加の利用不可データが含まれます。
 
-Frameworks should use this additional information to schedule tasks in a
-maintenance-aware fashion. Exactly how to do this depends on the design
-requirements of each scheduler, but tasks should typically be scheduled in a way
-that maximizes utilization but that also attempts to vacate machines before that
-machine's advertised unavailability period occurs. A scheduler might choose to
-place long-running tasks on machines with no unavailability, or failing that, on
-machines whose unavailability is the furthest away.
+フレームワークは、この追加情報を利用して、メンテナンスを考慮した形でタスクをスケジューリングする必要があります。具体的な方法は、各スケジューラの設計要件に依存しますが、通常、タスクは、利用率を最大化すると同時に、マシンの広告された利用不能期間が発生する前にマシンを空けるようにスケジュールされるべきです。スケジューラは、長時間稼働するタスクを利用不能のないマシンに配置するか、利用不能が最も遠いマシンに配置するかを選択することができます。
 
-How a framework responds to an inverse offer indicates its ability to conform to
-the maintenance schedule. Accepting an inverse offer communicates that the
-framework is okay with the current maintenance schedule, given the current state
-of the framework's resources.  The master and operator should interpret
-acceptance as a best-effort promise by the framework to free all the resources
-contained in the inverse offer before the start of the unavailability
-interval. Declining an inverse offer is an advisory notice to the operator that
-the framework is unable or unlikely to meet to the maintenance schedule.
+フレームワークが逆オファーにどのように反応するかは、メンテナンススケジュールに適合する能力を示します。逆オファーを受け入れることは、フレームワークのリソースの現在の状態を考慮して、フレームワークが現在のメンテナンススケジュールで問題ないことを伝える。マスターとオペレーターは、逆オファーに含まれるすべてのリソースを利用不可区間の開始前に解放するというフレームワークによる最善の努力の約束として、受け入れを解釈すべきである。逆オファーを辞退することは、フレームワークがメンテナンス・スケジュールを満たすことができない、またはできそうにないことをオペレータに勧告することである。
 
-For example:
+例えば、以下のようになります。:
 
-* A data store may choose to start a new replica if one of its agents is
-  scheduled for maintenance. The data store should accept an inverse offer if it
-  can reasonably copy the data on the machine to a new host before the
-  unavailability interval described in the inverse offer begins. Otherwise, the
-  data store should decline the offer.
-* A stateful task on an agent with an impending unavailability may be migrated
-  to another available agent.  If the framework has sufficient resources to do
-  so, it would accept any inverse offers.  Otherwise, it would decline them.
+* データストアは、そのエージェントの1つがメンテナンスを予定している場合、新しいレプリカを開始することを選択することができます。データストアは、逆オファーに記載されている利用不能期間が始まる前に、マシン上のデータを新しいホストに合理的にコピーできる場合は、逆オファーを受け入れるべきです。それ以外の場合は、データストアはその申し出を断るべきです。
+* 利用不能が迫っているエージェント上のステートフル・タスクは、利用可能な別のエージェントに移行することができる。フレームワークがそうするための十分なリソースを持っていれば、逆オファーを受け入れるだろう。そうでなければ、それを拒否するだろう。
 
-A framework can use a filter to control when it wants to be contacted again
-with an inverse offer.  This is useful since future circumstances may change
-the viability of the maintenance schedule.  The filter for inverse offers is
-identical to the existing mechanism for re-offering offers to frameworks.
+フレームワークは、フィルターを使用して、逆オファーで再度連絡を受けたいタイミングを制御することができます。これは、将来の状況によってメンテナンススケジュールの実行可能性が変わる可能性があるため、有用です。逆オファーのフィルタは、フレームワークにオファーを再提示する既存のメカニズムと同じです。
 
-**Note**: Accepting or declining an inverse offer does not result in
-immediate changes in the maintenance schedule or in the way Mesos acts.
-Inverse offers only represent extra information that frameworks may
-find useful. In the same manner, rejecting or accepting an inverse offer is a
-hint for an operator. The operator may or may not choose to take that hint
-into account.
+**注:** 逆オファーを受け入れたり辞退したりしても、メンテナンススケジュールやMesosの動作方法がすぐに変更されるわけではありません。逆オファーは、フレームワークが有用と考える追加情報を示すだけです。同じように、逆オファーを拒否または受け入れることは、オペレーターにとってのヒントです。オペレータは、そのヒントを考慮するかどうかを選択できます。
 
-### Starting maintenance
+### メンテナンスの開始
+オペレーターは、[/machine/down](endpoints/master/machine/down.md) HTTPエンドポイントにマシンのリストを投稿することで、メンテナンスを開始します。マシンのリストは、JSON形式で指定され、リストの各要素は[MachineID](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/v1/mesos.proto#L157-L167)となります。
 
-The operator starts maintenance by posting a list of machines to the
-[/machine/down](endpoints/master/machine/down.md) HTTP endpoint. The list of
-machines is specified in JSON format; each element of the list is a
-[MachineID](https://github.com/apache/mesos/blob/016b02d7ed5a65bcad9261a133c8237c2df66e6e/include/mesos/v1/mesos.proto#L157-L167).
-
-For example, to start maintenance on two machines:
+例えば、2台のマシンのメンテナンスを開始する場合:
 
 ```
 [
@@ -345,50 +200,25 @@ curl http://localhost:5050/machine/down \
   -d @machines.json
 ```
 
-The master checks that a list of machines has the following properties:
+マスターは、マシンのリストが以下のプロパティを持っていることを確認します。:
+* マシンのリストは空であってはなりません。
+* 各マシンは一度だけ表示されなければなりません。
+* 各マシンには、少なくともホスト名またはIPが含まれていなければなりません。ホスト名は大文字と小文字を区別しません。
+* マシンのIPが含まれる場合、正しく形成されていなければなりません。
+* リストアップされたすべてのマシンは、スケジュールに存在しなければなりません。
 
-* The list of machines must not be empty.
-* Each machine must only appear once.
-* Each machine must have at least a hostname or IP included.
-  The hostname is not case-sensitive.
-* If a machine's IP is included, it must be correctly formed.
-* All listed machines must be present in the schedule.
+これらのプロパティのいずれかが満たされていない場合、その操作は対応するエラーメッセージとともに拒否され、マスターの状態は変更されません。
 
-If any of these properties are not met, the operation is rejected with a
-corresponding error message and the master's state is not changed.
+オペレーターは、メンテナンスが予定されているすべてのマシンのメンテナンスを開始することができます。メンテナンスが予定されていないマシンは、アップモードからダウンモードに直接移行することはできない。しかし、オペレータは、現在の時刻または過去の時刻に等しいタイムスタンプを持つマシンをメンテナンスのためにスケジュールし、そのマシンのメンテナンスを直ちに開始することができる。
 
-The operator can start maintenance on any machine that is scheduled for
-maintenance. Machines that are not scheduled for maintenance cannot be directly
-transitioned from Up mode into Down mode.  However, the operator may schedule a
-machine for maintenance with a timestamp equal to the current time or in the
-past, and then immediately start maintenance on that machine.
+このエンドポイントは、現在Mesosマスターに登録されていないマシンのメンテナンスを開始するために使用できる。これは、マシンに障害が発生し、オペレーターがそのマシンをクラスターから削除しようとしている場合に役立ちます。マシンのメンテナンスを開始することで、そのマシンが誤って再起動され、Mesosクラスターに再参加することを防ぐことができます。
 
-This endpoint can be used to start maintenance on machines that are not
-currently registered with the Mesos master. This can be useful if a machine has
-failed and the operator intends to remove it from the cluster; starting
-maintenance on the machine prevents the machine from being accidentally rebooted
-and rejoining the Mesos cluster.
+オペレータは、マシンをDrainingモードからDownモードに明示的に移行させる必要があります。つまり、Mesosは、利用不能ウィンドウが到着または通過しても、マシンをDrainingモードに保つ。つまり、マシンの動作は一切中断されず、このマシンに対して（利用不可情報を含む）オファーが送信されたままになります。
 
-The operator must explicitly transition a machine from Draining to Down
-mode. That is, Mesos will keep a machine in Draining mode even if the
-unavailability window arrives or passes.  This means that the operation of the
-machine is not disrupted in any way and offers (with unavailability information)
-are still sent for this machine.
+オペレーターによってメンテナンスがトリガーされると、マシン上のすべてのエージェントはシャットダウンするように指示されます。これらのエージェントはマスターから削除されます。つまり、これらのエージェント上で実行されているすべてのタスクに対して、`TASK_LOST`ステータスアップデートが送信されます。スケジューラドライバの`slaveLost`コールバックも、削除された各エージェントに対して実行されます。また、メンテナンス中のマシン上のエージェントは、メンテナンスが完了してマシンが復旧するまで、マスターへの再登録ができなくなります。
 
-When maintenance is triggered by the operator, all agents on the machine are
-told to shutdown.  These agents are removed from the master, which means that a
-`TASK_LOST` status update will be sent for every task running on each of those
-agents. The scheduler driver's `slaveLost` callback will also be invoked for
-each of the removed agents. Any agents on machines in maintenance are also
-prevented from reregistering with the master in the future (until maintenance
-is completed and the machine is brought back up).
-
-### Completing maintenance
-
-When maintenance is complete or if maintenance needs to be cancelled,
-the operator can stop maintenance.  The process is very similar
-to starting maintenance (same validation criteria as the previous section).
-The operator posts a list of machines to the master's [/machine/up](endpoints/master/machine/up.md) endpoint:
+### メンテナンスの完了
+メンテナンスが完了した場合、またはメンテナンスをキャンセルする必要がある場合、オペレーターはメンテナンスを停止することができます。このプロセスは、メンテナンスの開始と非常によく似ています（前のセクションと同じ検証基準）。オペレーターは、マスターの[/machine/up](endpoints/master/machine/up.md)エンドポイントにマシンのリストを投稿します。:
 
 ```
 [
@@ -403,22 +233,12 @@ curl http://localhost:5050/machine/up \
   -X POST \
   -d @machines.json
 ```
+**注:** メンテナンススケジュールの "unavailability "フィールドで示されるメンテナンスウィンドウの期間は、オペレーターによる最善の推測である。利用不可期間の終了前にメンテナンスを停止することも、利用不可期間の終了後にメンテナンスを停止することも可能です。マシンが自動的にメンテナンス終了に移行することはありません。
 
-**Note**: The duration of the maintenance window, as indicated by the
-"unavailability" field in the maintenance schedule, is a best-effort guess made
-by the operator.  Stopping maintenance before the end of the unavailability
-interval is allowed, as is stopping maintenance after the end of the
-unavailability interval.  Machines are never automatically transitioned out of
-maintenance.
+フレームワークは、そのマシンからのオファーが送信され始めたときに、メンテナンスの完了またはキャンセルについて通知されます。メンテナンスが終了したことをフレームワークに通知する明示的なメカニズムはありません。メンテナンスが終了すると、新しいオファーに利用不可のタグが付けられなくなり、逆オファーも送信されなくなります。また、そのマシン上で実行されているエージェントは、Mesosマスターへの登録が許可されます。
 
-Frameworks are informed about the completion or cancellation of maintenance when
-offers from that machine start being sent.  There is no explicit mechanism for
-notifying frameworks when maintenance has finished.  After maintenance has
-finished, new offers are no longer tagged with unavailability and inverse offers
-are no longer sent.  Also, agents running on the machine will be allowed to
-register with the Mesos master.
-
-### Viewing maintenance status
+### メンテナンス状況の確認
+クラスタ内の各マシンの現在のメンテナンス状態（Up、Draining、Down）は、マスターの[/maintenance/status](endpoints/master/maintenance/status.md) HTTPエンドポイントにアクセスすることで確認できます。ドレイン中の各マシンについて、このエンドポイントには、そのマシン上のリソースに対する逆オファーに対するフレームワークの応答も含まれます。詳細については、[ClusterStatus message](https://github.com/apache/mesos/blob/fa36917dd142f66924c5f7ed689b87d5ceabbf79/include/mesos/maintenance/maintenance.proto#L73-L84)のフォーマットを参照してください。
 
 The current maintenance status (Up, Draining, or Down) of each machine in the
 cluster can be viewed by accessing the master's
@@ -427,5 +247,4 @@ each machine that is Draining, this endpoint also includes the frameworks' respo
 inverse offers for resources on that machine. For more information, see the
 format of the [ClusterStatus message](https://github.com/apache/mesos/blob/fa36917dd142f66924c5f7ed689b87d5ceabbf79/include/mesos/maintenance/maintenance.proto#L73-L84).
 
->NOTE: The format of the data returned by this endpoint may change in a
-future release of Mesos.
+>注: このエンドポイントが返すデータのフォーマットは、Mesosの将来のリリースで変更される可能性があります。

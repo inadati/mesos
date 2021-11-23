@@ -3,26 +3,16 @@ title: Apache Mesos - Downgrade Compatibility
 layout: documentation
 ---
 
-# Downgrade Mesos
+# Mesosのダウングレード
 
-This document serves as a guide for users who wish to downgrade from an
-existing Mesos cluster to a previous version. This usually happens when
-rolling back from problematic upgrades. Mesos provides compatibility
-between any 1.x and 1.y versions of masters/agents as long as new features
-are not used. Since Mesos 1.8, we introduced a check for minimum capabilities
-on the master. If a backwards incompatible feature is used, a corresponding
-minimum capability entry will be persisted to the registry. If an old master
-(that does not possess the capability) tries to recover from the registry
-(e.g. when rolling back), an error message will be printed containing the
-missing capabilities. This document lists the detailed information regarding
-these minimum capabilities and remediation for downgrade errors.
+このドキュメントは、既存のMesosクラスターを以前のバージョンにダウングレードしたいユーザー向けのガイドです。これは通常、問題のあるアップグレードからロールバックする際に発生します。Mesosは、新機能を使用しない限り、どの1.xバージョンと1.yバージョンのマスター/エージェント間でも互換性があります。Mesos 1.8からは、マスターの最小機能のチェックを導入しました。下位互換性のない機能が使用された場合、対応する最小能力エントリがレジストリに永続化されます。古いマスター（ケイパビリティを保有していない）がレジストリから回復しようとすると（ロールバック時など）、不足しているケイパビリティを含むエラーメッセージが表示されます。このドキュメントでは、これらの最小ケイパビリティに関する詳細な情報と、ダウングレードエラーの修正方法について説明します。
 
 
-## List of Master Minimum Capabilities
+## マスターの最小容量の一覧
 
 <table class="table table-striped">
 <thead>
-<tr><th>Capability</th><th>Description</th>
+<tr><th>機能</th><th>説明</th>
 </thead>
 
 <tr>
@@ -30,25 +20,17 @@ these minimum capabilities and remediation for downgrade errors.
     <code>AGENT_DRAINING</code>
   </td>
   <td>
-    This capability is required when any agent is marked for draining
-    or deactivated.  These states were added in Mesos 1.9 and are
-    triggered by using the <code>DRAIN_AGENT</code> or
-    <code>DEACTIVATE_AGENT</code> operator APIs.
-    <br/>
-    To remove this minimum capability requirement:
+    この能力は、任意のエージェントがドレインまたは非活性化のためにマークされているときに必要です。これらの状態はMesos 1.9で追加され、<code>DRAIN_AGENT</code>または<code>DEACTIVATE_AGENT</code>オペレーターAPIを使用してトリガーされます。
+この最小能力要件を削除するには:
     <ol>
       <li>
-        Stop the master downgrade and return to the more recent version.
+        マスターのダウングレードを停止して、より新しいバージョンに戻すことができます。
       </li>
       <li>
-        Find all agents that are marked for draining or deactivated.
-        This can be done by using the <code>GET_AGENTS</code> operator
-        API and checking the <code>deactivated</code> boolean field of
-        each agent.  All draining agents will also be deactivated.
+        ドレインマークがついている、または無効化されているエージェントをすべて見つけます。これは、<code>GET_AGENTS</code> オペレータ API を使用して、各エージェントの <code>deactivated</code> boolean フィールドをチェックすることで可能です。ドレイン中のエージェントもすべて非活性化されます。
       </li>
       <li>
-        Use the <code>REACTIVATE_AGENT</code> operator API for each
-        deactivated agent.
+        非活性化された各エージェントに対して、<code>REACTIVATE_AGENT</code>オペレーターAPIを使用します。
       </li>
     </ol>
   </td>
@@ -59,26 +41,17 @@ these minimum capabilities and remediation for downgrade errors.
     <code>QUOTA_V2</code>
   </td>
   <td>
-    This capability is required when quota is configured in Mesos 1.9 or
-    higher. When that happens, the newly configured quota will be persisted
-    in the <code>quota_configs</code> field in the registry which requires this
-    capability to decode.
-    <br/>
-    To remove this minimum capability requirement:
+    このケイパビリティは、Mesos 1.9以降でquotaが設定されたときに必要となります。この場合、新しく設定されたquotaは、デコードにこのケイパビリティを必要とするレジストリの<code>quota_configs</code>フィールドに永続化されます。
+この最小能力要件を削除するには:
     <ol>
       <li>
-        Stop the master downgrade and return to the more recent version.
+        マスターのダウングレードを停止して、より新しいバージョンに戻すことができます。
       </li>
       <li>
-        Use the <code>/registrar(id)/registry</code> endpoint to read the
-        registry content and identify roles listed under the
-        <code>quota_configs</code> field.
+        <code>/registrar(id)/registry</code>エンドポイントを使用してレジストリの内容を読み取り、<code>quota_configs</code>フィールドに記載されているロールを特定します。
       </li>
       <li>
-        Reset those roles' quota back to default (no guarantees and no limits).
-        This will remove the roles from the <code>quota_configs</code> field.
-        Once <code>quota_configs</code> becomes empty, the capability
-        requirement will be removed.
+        これらのロールのクォータをデフォルトに戻します（保証も制限もありません）。これにより、<code>quota_configs</code>フィールドからロールが削除されます。<code>quota_configs</code>が空になると、能力要件が削除されます。
       </li>
     </ol>
   </td>

@@ -3,32 +3,25 @@ title: Apache Mesos - CLI
 layout: documentation
 ---
 
-# The new CLI
+# 新しいCLI
 
-The new Mesos Command Line Interface provides one executable Python 3
-script to run all default commands and additional custom plugins.
+新しいMesos Command Line Interfaceは、1つの実行可能なPython 3スクリプトで、すべてのデフォルトコマンドと追加のカスタムプラグインを実行できます。
 
-Two of the subcommands available allow you to debug running containers:
+利用可能なサブコマンドのうち2つは、実行中のコンテナをデバッグすることができます。:
 
-* `mesos task exec`, to run a command in a running task's container.
-* `mesos task attach`, to attach your local terminal to a running task
-  and stream its input/output.
+* `mesos task exec`: 実行中のタスクのコンテナ内でコマンドを実行します。
+* `mesos task attach`: 実行中のタスクにローカル端末を接続し、入出力をストリームする。
 
-## Building the CLI
+## CLIのビルド
+今のところ、Mesos CLIはまだ開発中であり、標準的なMesosディストリビューションの一部としてビルドされていません。
 
-For now, the Mesos CLI is still under development and not built as part
-of a standard Mesos distribution.
+しかし、CLIは[Autotools](configuration/autotools.md)と[Cmakeのオプション](configuration/cmake.md)を使ってビルドすることができます。必要であれば、ビルドを開始する前にPython 3を設定するために、リンク先のページで説明されているオプションを確認してください。
 
-However, the CLI can be built using [Autotools](configuration/autotools.md) and
-[Cmake options](configuration/cmake.md). If necessary, check the options
-described in the linked pages to set Python 3 before starting a build.
+このビルドの結果は、実行可能な`mesos`バイナリになります。
 
-The result of this build will be a `mesos` binary that can be executed.
+## CLIの使用
 
-## Using the CLI
-
-Using the CLI without building Mesos is also possible. To do so, activate
-the CLI virtual environment by following the steps described below:
+Mesosを構築せずにCLIを使用することも可能です。そのためには、以下の手順でCLIの仮想環境を起動します。:
 
 ```
 $ cd src/python/cli_new/
@@ -37,17 +30,12 @@ $ source activate
 $ mesos
 ```
 
-Calling `mesos` will then run the CLI and calling `mesos-cli-tests` will
-run the integration tests.
+`mesos`を呼び出すとCLIが実行され、`mesos-cli-tests`を呼び出すと統合テストが実行されます。
 
-##  Configuring the CLI
+##  CLIの設定
+CLIは設定ファイルを使用して、クラスターのマスターがどこにあるかを知り、デフォルトで提供されているプラグインに加えて使用すべきプラグインをリストアップします。
 
-The CLI uses a configuration file to know where the masters of the cluster are
-as well as list any plugins that should be used in addition to the default ones
-provided.
-
-The configuation file, located by default at `~/.mesos/config.toml`, looks
-like this:
+設定ファイルは、デフォルトでは`~/.mesos/config.toml`にあり、以下のようになっています。:
 
 ```
 # The `plugins` array lists the absolute paths of the

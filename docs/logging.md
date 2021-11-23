@@ -3,89 +3,57 @@ title: Apache Mesos - Logging
 layout: documentation
 ---
 
-# Logging
+# ロギング
+Mesosは、各Mesosコンポーネントのログを、Mesosがそのコンポーネントのソースコードをどの程度制御しているかによって、異なった方法で処理します。
 
-Mesos handles the logs of each Mesos component differently depending on the
-degree of control Mesos has over the source code of the component.
+大まかに言うと、これらのカテゴリは:
 
-Roughly, these categories are:
-
-* [Internal](#Internal) - Master and Agent.
-* [Containers](#Containers) - Executors and Tasks.
-* External - Components launched outside of Mesos, like
-  Frameworks and [ZooKeeper](high-availability.md).  These are expected to
-  implement their own logging solution.
+* [Internal](#Internal) - マスターとエージェント。
+* [Containers](#Containers) - ExecutorとTask。
+* External - Frameworksや[ZooKeeper](high-availability.md)など、Mesosの外部で起動されるコンポーネント。これらのコンポーネントは、独自のロギング・ソリューションを実装することが期待されます。
 
 ## <a name="Internal"></a>Internal
 
-The Mesos Master and Agent use the
-[Google's logging library](https://github.com/google/glog).
-For information regarding the command-line options used to configure this
-library, see the
-[configuration documentation](configuration/master-and-agent.md#logging-options).
-Google logging options that are not explicitly mentioned there can be
-configured via environment variables.
+Mesos MasterとAgentは、[Googleのロギングライブラリ](https://github.com/google/glog)を使用しています。このライブラリの設定に使用されるコマンドラインオプションに関する情報は、[設定ドキュメント](configuration/master-and-agent.md#logging-options)を参照してください。Googleのロギング・オプションで明示的に言及されていないものは、環境変数で設定できます。
 
-Both Master and Agent also expose a [/logging/toggle](endpoints/logging/toggle.md)
-HTTP endpoint which temporarily toggles verbose logging:
+MasterとAgentは、[/logging/toggle](endpoints/logging/toggle.md) HTTPエンドポイントを公開しており、これは一時的に詳細なロギングに切り替えます。:
 
 ```
 POST <ip:port>/logging/toggle?level=[1|2|3]&duration=VALUE
 ```
 
-The effect is analogous to setting the `GLOG_v` environment variable prior
-to starting the Master/Agent, except the logging level will revert to the
-original level after the given duration.
+この効果は、マスター/エージェントの起動前に環境変数`GLOG_v`を設定した場合と似ていますが、指定された期間が経過するとログレベルが元に戻ります。
 
 ## <a name="Containers"></a>Containers
 
-For background, see [the containerizer documentation](containerizers.md).
+背景については、[containerizerのドキュメント](containerizers.md)を参照してください。
 
-Mesos does not assume any structured logging for entities running inside
-containers.  Instead, Mesos will store the stdout and stderr of containers
-into plain files ("stdout" and "stderr") located inside
-[the sandbox](sandbox.md#where-is-it).
+Mesosは、コンテナ内で実行されるエンティティの構造化ロギングを想定していません。代わりに、Mesosはコンテナの標準出力と標準エラーを[サンドボックス](sandbox.md#where-is-it)内にあるプレーンファイル（「stdout」と「stderr」）に格納します。
 
-In some cases, the default Container logger behavior of Mesos is not ideal:
+場合によっては、Mesosのデフォルトのコンテナロガーの動作が理想的ではないこともあります。:
 
-* Logging may not be standardized across containers.
-* Logs are not easily aggregated.
-* Log file sizes are not managed.  Given enough time, the "stdout" and "stderr"
-  files can fill up the Agent's disk.
+* ロギングがコンテナ間で標準化されていない可能性があります。
+* ログの集約が容易ではない。
+* ログファイルのサイズは管理されていません。十分な時間があれば、「stdout」および「stderr」ファイルが Agent のディスクを埋め尽くす可能性があります。
 
-## `ContainerLogger` Module
+## `ContainerLogger` モジュール
+`ContainerLogger`モジュールはMesos 0.27.0で導入され、コンテナのデフォルトのログ動作の欠点に対処することを目的としています。このモジュールは、Mesosがコンテナのstdoutとstderrをリダイレクトする方法を変更するために使用できます。
 
-The `ContainerLogger` module was introduced in Mesos 0.27.0 and aims to address
-the shortcomings of the default logging behavior for containers.  The module
-can be used to change how Mesos redirects the stdout and stderr of containers.
+[`ContainerLogger`のインターフェースはこちら](https://github.com/apache/mesos/blob/master/include/mesos/slave/container_logger.hpp)にあります。
 
-The [interface for a `ContainerLogger` can be found here](https://github.com/apache/mesos/blob/master/include/mesos/slave/container_logger.hpp).
+Mesosには2つの`ContainerLogger`モジュールが付属しています。:
 
-Mesos comes with two `ContainerLogger` modules:
-
-* The `SandboxContainerLogger` implements the existing logging behavior as
-  a `ContainerLogger`.  This is the default behavior.
-* The `LogrotateContainerLogger` addresses the problem of unbounded log file
-  sizes.
+* `SandboxContainerLogger` は、既存のロギング動作を `ContainerLogger` として実装しています。これがデフォルトの動作です。
+* `LogrotateContainerLogger` は、束縛されないログファイルサイズの問題に対処します。
 
 ### `LogrotateContainerLogger`
 
-The `LogrotateContainerLogger` constrains the total size of a container's
-stdout and stderr files.  The module does this by rotating log files based
-on the parameters to the module.  When a log file reaches its specified
-maximum size, it is renamed by appending a `.N` to the end of the filename,
-where `N` increments each rotation.  Older log files are deleted when the
-specified maximum number of files is reached.
+`LogrotateContainerLogger` は、コンテナの stdout および stderr ファイルの合計サイズを制限します。このモジュールは、モジュールへのパラメータに基づいてログファイルを回転させることでこれを行います。ログファイルが指定された最大サイズに達すると、ファイル名の最後に `.N` を追加して名前が変更されます（`N` はローテーションごとに増加します）。古いログファイルは、指定された最大ファイル数に達すると削除されます。
 
-#### Invoking the module
+#### モジュールの起動
+`LogrotateContainerLogger` は、エージェントの起動時に [`--modules` flag](modules.md#Invoking)でライブラリ `liblogrotate_container_logger.so` を指定し、 `--container_logger` Agent フラグに `org_apache_mesos_LogrotateContainerLogger` を設定することでロードできます。
 
-The `LogrotateContainerLogger` can be loaded by specifying the library
-`liblogrotate_container_logger.so` in the
-[`--modules` flag](modules.md#Invoking) when starting the Agent and by
-setting the `--container_logger` Agent flag to
-`org_apache_mesos_LogrotateContainerLogger`.
-
-#### Module parameters
+#### モジュールのパラメーター
 
 <table class="table table-striped">
   <thead>
@@ -94,7 +62,7 @@ setting the `--container_logger` Agent flag to
         Key
       </th>
       <th>
-        Explanation
+        説明
       </th>
     </tr>
   </thead>
@@ -104,10 +72,8 @@ setting the `--container_logger` Agent flag to
       <code>max_stdout_size</code>/<code>max_stderr_size</code>
     </td>
     <td>
-      Maximum size, in bytes, of a single stdout/stderr log file.
-      When the size is reached, the file will be rotated.
-
-      Defaults to 10 MB.  Minimum size of 1 (memory) page, usually around 4 KB.
+      1つのstdout/stderrログファイルの最大サイズ（バイト）です。このサイズに達すると、ファイルのローテーションが行われます。
+      デフォルトは10MBです。 1（メモリ）ページの最小サイズは、通常4KB程度です。
     </td>
   </tr>
 
@@ -117,15 +83,13 @@ setting the `--container_logger` Agent flag to
       <code>logrotate_stderr_options</code>
     </td>
     <td>
-      Additional config options to pass into <code>logrotate</code> for stdout.
-      This string will be inserted into a <code>logrotate</code> configuration
-      file. i.e. For "stdout":
+      <code>logrotate</code>に渡す標準出力用の追加設定オプション。この文字列は、<code>logrotate</code>の設定ファイルに挿入されます。 例:「stdout」の場合。:
       <pre>
 /path/to/stdout {
   [logrotate_stdout_options]
   size [max_stdout_size]
 }</pre>
-      NOTE: The <code>size</code> option will be overridden by this module.
+      注: <code>size</code>オプションは、このモジュールによって上書きされます。
     </td>
   </tr>
 
@@ -134,20 +98,14 @@ setting the `--container_logger` Agent flag to
       <code>environment_variable_prefix</code>
     </td>
     <td>
-      Prefix for environment variables meant to modify the behavior of
-      the logrotate logger for the specific container being launched.
-      The logger will look for four prefixed environment variables in the
-      container's <code>CommandInfo</code>'s <code>Environment</code>:
+      起動している特定のコンテナに対する logrotate ロガーの動作を変更するための環境変数のプレフィックスです。ロガーは、コンテナの <code>CommandInfo</code> の <code>Environment</code> にある 4 つのプレフィックス付き環境変数を探します。:
       <ul>
         <li><code>MAX_STDOUT_SIZE</code></li>
         <li><code>LOGROTATE_STDOUT_OPTIONS</code></li>
         <li><code>MAX_STDERR_SIZE</code></li>
         <li><code>LOGROTATE_STDERR_OPTIONS</code></li>
       </ul>
-      If present, these variables will overwrite the global values set
-      via module parameters.
-
-      Defaults to <code>CONTAINER_LOGGER_</code>.
+      これらの変数が存在すると、モジュールのパラメータで設定されたグローバルな値を上書きします。デフォルトは <code>CONTAINER_LOGGER_</code> です。
     </td>
   </tr>
 
@@ -156,11 +114,7 @@ setting the `--container_logger` Agent flag to
       <code>launcher_dir</code>
     </td>
     <td>
-      Directory path of Mesos binaries.
-      The <code>LogrotateContainerLogger</code> will find the
-      <code>mesos-logrotate-logger</code> binary under this directory.
-
-      Defaults to <code>/usr/local/libexec/mesos</code>.
+      Mesosのバイナリのディレクトリパス。<code>LogrotateContainerLogger</code>は、このディレクトリの下にある<code>mesos-logrotate-logger</code>バイナリを見つけます。デフォルトは <code>/usr/local/libexec/mesos</code> です。
     </td>
   </tr>
 
@@ -169,48 +123,25 @@ setting the `--container_logger` Agent flag to
       <code>logrotate_path</code>
     </td>
     <td>
-      If specified, the <code>LogrotateContainerLogger</code> will use the
-      specified <code>logrotate</code> instead of the system's
-      <code>logrotate</code>.  If <code>logrotate</code> is not found, then
-      the module will exit with an error.
+      指定された場合、<code>LogrotateContainerLogger</code> は、システムの <code>logrotate</code> の代わりに、指定された <code>logrotate</code> を使用します。<code>logrotate</code> が見つからない場合は、モジュールはエラーで終了します。
     </td>
   </tr>
 </table>
 
-#### How it works
+#### 仕組みについて
+1. コンテナが起動するたびに、`LogrotateContainerLogger`は`mesos-logrotate-logger`バイナリのコンパニオンサブプロセスを起動します。
+2. このモジュールは、コンテナのstdout/stderrを`mesos-logrotate-logger`にリダイレクトするようMesosに指示します。
+3. コンテナがstdout/stderrに出力すると、`mesos-logrotate-logger`はその出力を "stdout"/"stderr "ファイルにパイプします。ファイルが大きくなると、`mesos-logrotate-logger`は`logrotate`を呼び出して、ファイルを設定された最大サイズ以下に厳密に維持します。
+4. コンテナが終了すると、`mesos-logrotate-logger`は終了する前にロギングを終了します。
 
-1. Every time a container starts up, the `LogrotateContainerLogger`
-   starts up companion subprocesses of the `mesos-logrotate-logger` binary.
-2. The module instructs Mesos to redirect the container's stdout/stderr
-   to the `mesos-logrotate-logger`.
-3. As the container outputs to stdout/stderr, `mesos-logrotate-logger` will
-   pipe the output into the "stdout"/"stderr" files.  As the files grow,
-   `mesos-logrotate-logger` will call `logrotate` to keep the files strictly
-   under the configured maximum size.
-4. When the container exits, `mesos-logrotate-logger` will finish logging before
-   exiting as well.
+`LogrotateContainerLogger`は、Agentのフェイルオーバーにも対応できるように設計されています。Agentプロセスが終了しても、`mesos-logrotate-logger`のインスタンスは継続して実行されます。
 
-The `LogrotateContainerLogger` is designed to be resilient across Agent
-failover.  If the Agent process dies, any instances of `mesos-logrotate-logger`
-will continue to run.
+### カスタム`ContainerLogger`の作成
+モジュールの書き方の基本については、[modulesのドキュメント](modules.md)をご覧ください。
 
-### Writing a Custom `ContainerLogger`
+新しい`ContainerLogger`を設計する際には、いくつかの注意点があります。:
 
-For basics on module writing, see [the modules documentation](modules.md).
-
-There are several caveats to consider when designing a new `ContainerLogger`:
-
-* Logging by the `ContainerLogger` should be resilient to Agent failover.
-  If the Agent process dies (which includes the `ContainerLogger` module),
-  logging should continue.  This is usually achieved by using subprocesses.
-* When containers shut down, the `ContainerLogger` is not explicitly notified.
-  Instead, encountering `EOF` in the container's stdout/stderr signifies
-  that the container has exited.  This provides a stronger guarantee that the
-  `ContainerLogger` has seen all the logs before exiting itself.
-* The `ContainerLogger` should not assume that containers have been launched
-  with any specific `ContainerLogger`.  The Agent may be restarted with a
-  different `ContainerLogger`.
-* Each [containerizer](containerizers.md) running on an Agent uses its own
-  instance of the `ContainerLogger`.  This means more than one `ContainerLogger`
-  may be running in a single Agent.  However, each Agent will only run a single
-  type of `ContainerLogger`.
+* `ContainerLogger`によるロギングは、Agentのフェイルオーバーに強いものでなければなりません。Agentプロセス（`ContainerLogger`モジュールを含む）が死亡しても、ロギングは継続されるべきである。これは通常、サブプロセスを使用することで実現できます。
+* コンテナがシャットダウンしても、`ContainerLogger`には明示的に通知されません。代わりに、コンテナのstdout/stderrで`EOF`に遭遇すると、コンテナが終了したことを示す。これにより、`ContainerLogger`が自分自身を終了する前にすべてのログを見たことがより強く保証されます。
+* `ContainerLogger` は、特定の `ContainerLogger` でコンテナが起動されたと仮定してはいけません。Agent は、異なる `ContainerLogger` で再起動することができる。
+* Agent上で動作する各[containerizer](containerizers.md)は、それぞれの`ContainerLogger`のインスタンスを使用します。つまり、1つのAgentで複数の`ContainerLogger`を実行することができます。ただし、各 Agent は 1 種類の `ContainerLogger` しか実行しません。

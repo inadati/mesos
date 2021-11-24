@@ -3,19 +3,19 @@ title: Apache Mesos - Operational Guide
 layout: documentation
 ---
 
-# Operational Guide
+# 操作ガイド
 
-## Using a process supervisor
-Mesos uses a "[fail-fast](https://en.wikipedia.org/wiki/Fail-fast)" approach to error handling: if a serious error occurs, Mesos will typically exit rather than trying to continue running in a possibly erroneous state. For example, when Mesos is configured for [high availability](high-availability.md), the leading master will abort itself when it discovers it has been partitioned away from the Zookeeper quorum. This is a safety precaution to ensure the previous leader doesn't continue communicating in an unsafe state.
+## プロセススーパーバイザーの活用
+Mesosはエラー処理に "[fail-fast](https://en.wikipedia.org/wiki/Fail-fast)"アプローチを採用しています。:重大なエラーが発生した場合、Mesosは通常、エラーが発生する可能性のある状態で実行を続けるのではなく、終了します。たとえば、Mesosが[ハイアベイラビリティ](high-availability.md)に設定されている場合、リーディングマスターは、Zookeeperのクォーラムからパーティショニングされていることを発見すると、自らを終了させます。これは、前のリーダーが安全でない状態で通信を続けないようにするための安全対策です。
 
-To ensure that such failures are handled appropriately, production deployments of Mesos typically use a _process supervisor_ (such as systemd or supervisord) to detect when Mesos processes exit. The supervisor can be configured to restart the failed process automatically and/or to notify the cluster operator to investigate the situation.
+このような障害を適切に処理するために、Mesosの本番環境では通常、プロセススーパーバイザ（systemdやsupervisordなど）を使用してMesosプロセスの終了を検出します。スーパバイザは、障害が発生したプロセスを自動的に再起動したり、クラスタオペレータに通知して状況を調査するように設定できます。
 
-## Changing the master quorum
-The master leverages a [Paxos-based replicated log](replicated-log-internals.md) as its storage backend (`--registry=replicated_log` is the only storage backend currently supported). Each master participates in the ensemble as a log replica. The `--quorum` flag determines a majority of the masters.
+## マスタークォーラムの変更
+マスターは[Paxosベースのレプリケートログ](replicated-log-internals.md)をストレージバックエンドとして活用します（`--registry=replicated_log`は現在サポートされている唯一のストレージバックエンドです）。各マスターはログのレプリカとしてアンサンブルに参加します。`--quorum` フラグでマスターの過半数を決定します。
 
-The following table shows the tolerance to master failures for each quorum size:
+次の表は、各クォーラムサイズにおけるマスターの障害に対する耐性を示しています。:
 
-| Masters  | Quorum Size | Failure Tolerance |
+| マスター  | クォーラムサイズ | 失敗の許容範囲 |
 | -------: | ----------: | ----------------: |
 |        1 |           1 |                 0 |
 |        3 |           2 |                 1 |
@@ -23,47 +23,45 @@ The following table shows the tolerance to master failures for each quorum size:
 |      ... |         ... |               ... |
 |   2N - 1 |           N |             N - 1 |
 
-It is recommended to run with 3 or 5 masters, when desiring high availability.
+高可用性を求める場合には、3つまたは5つのマスターで運用することをお勧めします。
 
-### NOTE
-When configuring the quorum, it is essential to ensure that there are only so many masters running as specified in the table above. If additional masters are running, this violates the quorum and the log may be corrupted! As a result, it is recommended to gate the running of the master process with something that enforces a static whitelist of the master hosts. See [MESOS-1546](https://issues.apache.org/jira/browse/MESOS-1546) for adding a safety whitelist within Mesos itself.
+### 注意
+クォーラムを設定する際には、上の表で指定された数だけのマスターが稼働していることを確認することが重要です。さらにマスターが動作していると、クォーラムに違反し、ログが破損する可能性があります。そのため、マスターホストの静的なホワイトリストを強制するもので、マスタープロセスの実行をゲートすることをお勧めします。Mesos自体で安全なホワイトリストを追加するには、[MESOS-1546](https://issues.apache.org/jira/browse/MESOS-1546)を参照してください。
 
-For online reconfiguration of the log, see: [MESOS-683](https://issues.apache.org/jira/browse/MESOS-683).
+ログのオンライン再設定については、以下を参照してください。[MESOS-683](https://issues.apache.org/jira/browse/MESOS-683)を参照してください。
 
-### Increasing the quorum size
-As the size of a cluster grows, it may be desired to increase the quorum size for additional fault tolerance.
+### クォーラムサイズの増やす
+クラスタの規模が大きくなると、フォールトトレランスを高めるためにクォーラムサイズを大きくしたいと思うことがあります。
 
-The following steps indicate how to increment the quorum size, using 3 -> 5 masters as an example (quorum size 2 -> 3):
+以下の手順は、3→5マスターを例に、クォーラムサイズを増やす方法を示しています。（クォーラムサイズ2→3）:
 
-1. Initially, 3 masters are running with `--quorum=2`
-2. Restart the original 3 masters with `--quorum=3`
-3. Start 2 additional masters with `--quorum=3`
+1. 初期状態では、`--quorum=2`で3つのマスターが動作しています。
+2. 元の3台のマスターを `--quorum=3` で再起動します。
+3. 2台のマスターを `--quorum=3` で追加起動します。
 
-To increase the quorum by N, repeat this process to increment the quorum size N times.
+クォーラムをN倍にするには、このプロセスを繰り返してクォーラムサイズをN倍にします。
 
-NOTE: Currently, moving out of a single master setup requires wiping the replicated log
-state and starting fresh. This will wipe all persistent data (e.g., agents, maintenance
-information, quota information, etc). To move from 1 master to 3 masters:
+注: 現在、シングルマスターの設定を解除するには、複製されたログの状態を消去して新たに始める必要があります。これにより、すべての永続的なデータ（エージェント、メンテナンス情報、クォータ情報など）が消去されます。1マスターから3マスターに移行するには:
 
-1. Stop the standalone master.
-2. Remove the replicated log data (`replicated_log` under the `--work_dir`).
-3. Start the original master and two new masters with `--quorum=2`
+1. スタンドアロン・マスターを停止します。
+2. 複製されたログデータ（`--work_dir`の下の`replicated_log`）を削除します。
+3. 元のマスターと2つの新しいマスターを `--quorum=2` で起動します。
 
-### Decreasing the quorum size
+### クォーラムサイズを減らす
 
-The following steps indicate how to decrement the quorum size, using 5 -> 3 masters as an example (quorum size 3 -> 2):
+以下の手順は、5→3のマスターを例に、クォーラムサイズを減少させる方法を示しています。（クォーラムサイズ3→2）:
 
-1. Initially, 5 masters are running with `--quorum=3`
-2. Remove 2 masters from the cluster, ensure they will not be restarted (see NOTE section above). Now 3 masters are running with `--quorum=3`
-3. Restart the 3 masters with `--quorum=2`
+1. 初期状態では5台のマスターが`--quorum=3`で動作しています。
+2. 2つのマスターをクラスタから削除し、再起動されないようにします(上記のNOTEセクションを参照)。現在、3台のマスターが `--quorum=3` で動作しています。
+3. 3台のマスターを`--quorum=2`で再起動します。
 
-To decrease the quorum by N, repeat this process to decrement the quorum size N times.
+クォーラムをN倍にするには、このプロセスを繰り返してクォーラムサイズをN倍にします。
 
-### Replacing a master
-Please see the NOTE section above. So long as the failed master is guaranteed to not re-join the ensemble, it is safe to start a new master _with an empty log_ and allow it to catch up.
+### マスターの交換
+上記の注意セクションを参照してください。故障したマスターがアンサンブルに再参加しないことが保証されている限り、ログを空にして新しいマスターを起動し、追いつくのを待つのが安全です。
 
-## External access for Mesos master
-If the default IP (or the command line arg `--ip`) is an internal IP, then external entities such as framework schedulers will be unable to reach the master. To address that scenario, an externally accessible IP:port can be setup via the `--advertise_ip` and `--advertise_port` command line arguments of `mesos-master`. If configured, external entities such as framework schedulers interact with the advertise_ip:advertise_port from where the request needs to be proxied to the internal IP:port on which the Mesos master is listening.
+## Mesosマスターの外部アクセス
+デフォルトIP(またはコマンドライン引数`--ip`)が内部IPの場合、フレームワークスケジューラーなどの外部エンティティはマスターにアクセスできません。このシナリオに対処するために、外部からアクセス可能なIP:ポートを`mesos-master`の`--advertise_ip`および`--advertise_port`コマンドライン引数で設定できます。設定されている場合、フレームワークスケジューラーなどの外部エンティティはadvertise_ip:advertise_portと対話し、そこからリクエストをMesosマスターがリッスンしている内部IP:ポートにプロキシする必要があります。
 
-## HTTP requests to non-leading master
-HTTP requests to some master endpoints (e.g., [/state](endpoints/master/state.md), [/machine/down](endpoints/master/machine/down.md)) can only be answered by the leading master. Such requests made to a non-leading master will result in either a `307 Temporary Redirect` (with the location of the leading master) or `503 Service Unavailable` (if the master does not know who the current leader is).
+## ノンリーディングマスターへのHTTPリクエスト
+いくつかのマスターエンドポイント（例：[/state](endpoints/master/state.md)、[/machine/down](endpoints/master/machine/down.md)）へのHTTPリクエストは、リーディングマスターによってのみ回答されます。リードしていないマスターへのそのようなリクエストは、`307 Temporary Redirect`（リードしているマスターの場所を示す）または`503 Service Unavailable`（マスターが現在のリーダーを知らない場合）のいずれかになります。

@@ -5,65 +5,29 @@ layout: documentation
 
 # Mesos Fetcher
 
-Mesos 0.23.0 introduced experimental support for the Mesos _fetcher cache_.
+Mesos 0.23.0では、Mesos fetcher cacheを実験的にサポートしました。
 
-In this context we loosely regard the term "downloading" as to include copying
-from local file systems.
+この文脈では、ローカルファイルシステムからのコピーも含めて、「ダウンロード」という用語を緩く捉えています。
 
-## What is the Mesos fetcher?
+## Mesos fetcherとは？
+Mesos fetcherは、タスクの実行に備えて、タスクの[サンドボックスディレクトリ](sandbox.md)にリソースをダウンロードするためのメカニズムです。TaskInfoメッセージの一部として、タスクの実行を指示するフレームワークが`CommandInfo::URI` protobuf値のリストを提供し、これがMesos fetcherの入力となります。
 
-The Mesos fetcher is a mechanism to download resources into the [sandbox
-directory](sandbox.md) of a task in preparation of running
-the task. As part of a TaskInfo message, the framework ordering the task's
-execution provides a list of `CommandInfo::URI` protobuf values, which becomes
-the input to the Mesos fetcher.
+Mesosフェッチャーは、ローカルファイルシステムからファイルをコピーすることができ、HTTP、HTTPS、FTP、FTPSの各プロトコルもネイティブにサポートしています。要求されたURIが他のプロトコルに基づいている場合、フェッチャーはローカルのHadoopクライアントを利用しようとするため、HDFSやS3などのHadoopクライアントがサポートするあらゆるプロトコルをサポートします。Hadoopクライアントへのパスを使ってエージェントを設定する方法については、エージェントの[設定ドキュメント](configuration/agent.md)を参照してください。
 
-The Mesos fetcher can copy files from a local filesytem and it also natively
-supports the HTTP, HTTPS, FTP and FTPS protocols. If the requested URI is based
-on some other protocol, then the fetcher tries to utilise a local Hadoop client
-and hence supports any protocol supported by the Hadoop client, e.g., HDFS, S3.
-See the agent [configuration documentation](configuration/agent.md)
-for how to configure the agent with a path to the Hadoop client.
+デフォルトでは、リクエストされた各URIはサンドボックスディレクトリに直接ダウンロードされ、同じURIへのリクエストを繰り返すと、同じリソースの別のコピーをダウンロードすることになります。また、フェッチャーは、後続のダウンロードで再利用できるように、URIのダウンロードを専用のディレクトリにキャッシュするように指示することもできます。
 
-By default, each requested URI is downloaded directly into the sandbox directory
-and repeated requests for the same URI leads to downloading another copy of the
-same resource. Alternatively, the fetcher can be instructed to cache URI
-downloads in a dedicated directory for reuse by subsequent downloads.
+Mesosのフェッチャー機構は、以下の2つの部分で構成されています。:
+1. すべてのフェッチアクションを制御・調整するエージェント内部のフェッチャープロセス（libprocessの観点から）。すべてのエージェントインスタンスは、あらゆる種類のコンテナーライザーによって使用される、正確に1つの内部フェッチャーインスタンスを持っています。
 
-The Mesos fetcher mechanism comprises of these two parts:
+2. 前者によって起動される外部プログラム`mesos-fetcher`。前者によって呼び出される外部プログラム`mesos-fetcher`は、キャッシュ内部の簿記のためのファイル削除とファイルサイズの問い合わせを除き、すべてのネットワークおよびディスク操作を行う。エージェントプロセスをI/O関連の危険から保護するために、外部のOSプロセスとして実行されます。フェッチアクションの詳細を記述したJSONオブジェクトを含む環境変数の形で指示を受けます。
 
-1. The agent-internal Fetcher Process (in terms of libprocess) that controls and
-coordinates all fetch actions. Every agent instance has exactly one internal
-fetcher instance that is used by every kind of containerizer.
+## フェッチプロシージャー
+フレームワークは、スケジューラドライバのメソッド `launchTasks()`を呼び出し、引数として `CommandInfo` protobuf 構造体を渡してタスクを起動します。このタイプの構造体は、タスク実行の前提条件として、エージェント・ノードのサンドボックス・ディレクトリに「フェッチ」する必要のあるコマンドとURIのリストを指定します。したがって、エージェントはタスク起動のリクエストを受け取ると、まずフェッチャーを呼び出して、指定されたリソースをサンドボックス・ディレクトリにプロビジョニングします。フェッチに失敗した場合、タスクは開始されず、報告されるタスク・ステータスは`TASK_FAILED`となります。
 
-2. The external program `mesos-fetcher` that is invoked by the former. It
-performs all network and disk operations except file deletions and file size
-queries for cache-internal bookkeeping. It is run as an external OS process in
-order to shield the agent process from I/O-related hazards. It takes
-instructions in form of an environment variable containing a JSON object with
-detailed fetch action descriptions.
+与えられたタスクに要求されたすべてのURIは、mesos-fetcherの1回の呼び出しで順次フェッチされます。ここでは、ダウンロードの同時実行を避けることで、帯域幅の問題のリスクが多少軽減されます。ただし、複数のタスク起動要求により、複数のフェッチ操作が同時にアクティブになる可能性があります。
 
-## The fetch procedure
-
-Frameworks launch tasks by calling the scheduler driver method `launchTasks()`,
-passing `CommandInfo` protobuf structures as arguments. This type of structure
-specifies (among other things) a command and a list of URIs that need to be
-"fetched" into the sandbox directory on the agent node as a precondition for
-task execution. Hence, when the agent receives a request to launch a task, it
-calls upon its fetcher, first, to provision the specified resources into the
-sandbox directory. If fetching fails, the task is not started and the reported
-task status is `TASK_FAILED`.
-
-All URIs requested for a given task are fetched sequentially in a single
-invocation of mesos-fetcher. Here, avoiding download concurrency reduces the
-risk of bandwidth issues somewhat. However, multiple fetch operations can be
-active concurrently due to multiple task launch requests.
-
-### The URI protobuf structure
-
-Before mesos-fetcher is started, the specific fetch actions to be performed for
-each URI are determined based on the following protobuf structure. (See
-`include/mesos/mesos.proto` for more details.)
+### URIのprotobuf構造
+mesos-fetcherが起動する前に、以下のprotobuf構造に基づいて、各URIに対して実行する特定のフェッチアクションが決定されます。(詳細は`include/mesos/mesos.proto`をご参照ください。)
 
     message CommandInfo {
       message URI {
@@ -77,237 +41,143 @@ each URI are determined based on the following protobuf structure. (See
       optional string user = 5;
     }
 
-The field "value" contains the URI.
+フィールド "value"には、URIが格納されます。
 
-If the "executable" field is "true", the "extract" field is ignored and
-has no effect.
+executable "フィールドが "true "の場合、"extract "フィールドは無視され、何の影響もありません。
 
-If the "cache" field is true, the fetcher cache is to be used for the URI.
+cache」フィールドが「true」の場合、URIに対してフェッチャーのキャッシュが使用されます。
 
-If the "output_file" field is set, the fetcher will use that name for the copy
-stored in the sandbox directory. "output_file" may contain a directory
-component, in which case the path described must be a relative path.
+output_file」フィールドが設定されている場合、フェッチャーはサンドボックス・ディレクトリに保存されているコピーにその名前を使用する。"output_file"には、ディレクトリ・コンポーネントが含まれる場合がありますが、その場合、記述されるパスは相対パスでなければなりません。
 
-### Specifying a user name
+### ユーザー名の指定
+フレームワークは、フェッチ・パラメータとなるユーザー名を渡すことができます。これにより、そのエクゼキュータやタスクは、特定のユーザの下で実行されます。ただし、CommandInfo構造体の「user」フィールドが指定されている場合は、影響を受けるタスクに優先して適用されます。
 
-The framework may pass along a user name that becomes a fetch parameter. This
-causes its executors and tasks to run under a specific user. However, if the
-"user" field in the CommandInfo structure is specified, it takes precedence for
-the affected task.
+いずれの方法でもユーザ名が指定された場合、フェッチャーはまず、それが実際にエージェント上で有効なユーザ名であるかどうかを検証します。そうでない場合、フェッチはここで失敗します。そうでない場合は、フェッチ手順の最後、タスクの実行が始まる前に、サンドボックス・ディレクトリが（`chown`を使用して）所有者として指定されたユーザに割り当てられます。
 
-If a user name is specified either way, the fetcher first validates that it is
-in fact a valid user name on the agent. If it is not, fetching fails right here.
-Otherwise, the sandbox directory is assigned to the specified user as owner
-(using `chown`) at the end of the fetch procedure, before task execution begins.
+再生されるユーザー名は、キャッシングに重要な影響を与えます。キャッシングはユーザーごとに管理されます。つまり、ユーザー名と「uri」の組み合わせによって、キャッシュ可能なフェッチ結果が一意に識別されます。ユーザー名が指定されていない場合、これも別のユーザーとしてキャッシュにカウントされます。このようにして、それぞれの有効なユーザのキャッシュファイルは、指定されていないものも含めて、他のすべてのユーザから分離されます。
 
-The user name in play has an important effect on caching.  Caching is managed on
-a per-user base, i.e. the combination of user name and "uri" uniquely
-identifies a cacheable fetch result. If no user name has been specified, this
-counts for the cache as a separate user, too. Thus cache files for each valid
-user are segregated from all others, including those without a specified user.
+これは、異なるユーザーが指定された場合、全く同じURIが複数回ダウンロードされ、キャッシュされることを意味します。
 
-This means that the exact same URI will be downloaded and cached multiple times
-if different users are indicated.
+### 実行可能なフェッチ結果
 
-### Executable fetch results
+デフォルトでは、フェッチされたファイルは実行可能ではありません。
 
-By default, fetched files are not executable.
+フィールド "executable"が "true"に設定されている場合、フェッチ結果はすべてのユーザーに対して（"chmod"によって）実行可能なものに変更されます。これは、フェッチ手順の最後に、サンドボックス・ディレクトリ内でのみ行われます。どのキャッシュファイルにも影響はありません。
 
-If the field "executable" is set to "true", the fetch result will be changed to
-be executable (by "chmod") for every user. This happens at the end of the fetch
-procedure, in the sandbox directory only. It does not affect any cache file.
+### アーカイブの抽出
 
-### Archive extraction
-
-If the "extract" field is "true", which is the default, then files with
-a recognized extension that hints at packed or compressed archives are unpacked
-in the sandbox directory. These file extensions are recognized:
+"extract"フィールドがデフォルトの「true」の場合、パックされた、または圧縮されたアーカイブを示唆する、認識された拡張子を持つファイルは、サンドボックスディレクトリで解凍されます。認識される拡張子は以下のとおりです。:
 
 - .tar, .tar.gz, .tar.bz2, .tar.xz
 - .gz, .tgz, .tbz2, .txz, .zip
 
-In case the cache is bypassed, both the archive and the unpacked results will be
-found together in the sandbox. In case a cache file is unpacked, only the
-extraction result will be found in the sandbox.
+キャッシュがバイパスされている場合、アーカイブと解凍された結果の両方がサンドボックスに表示されます。キャッシュファイルが解凍された場合は、抽出結果のみがサンドボックス内に表示されます。
 
-The "output_file" field is useful here for cases where the URI ends with query
-parameters, since these will otherwise end up in the file copied to the sandbox
-and will subsequently fail to be recognized as archives.
+output_file」フィールドは、URIがクエリパラメータで終わっている場合に有用である。
 
-### Bypassing the cache
+### キャッシュを回避する
 
-By default, the URI field "cache" is not present. If this is the case or its
-value is "false" the fetcher downloads directly into the sandbox directory.
+デフォルトでは、URIフィールド「cache」は存在しない。この場合、またはその値が「false」の場合、フェッチャーはサンドボックスのディレクトリに直接ダウンロードします。
 
-The same also happens dynamically as a fallback strategy if anything goes wrong
-when preparing a fetch operation that involves the cache. In this case, a
-warning message is logged. Possible fallback conditions are:
+また、キャッシュを含むフェッチ操作の準備中に何か問題が発生した場合、フォールバック戦略として同じことが動的に起こります。この場合には、警告メッセージが記録されます。可能なフォールバック条件は:
 
-- The server offering the URI does not respond or reports an error.
-- The URI's download size could not be determined.
-- There is not enough space in the cache, even after attempting to evict files.
+* URIを提供しているサーバーが応答しないか、エラーを報告している。
+* URIのダウンロードサイズが確定できませんでした。
+* ファイルの退避を試みても、キャッシュに十分な容量がありません。
 
-### Fetching through the cache
+### キャッシュを利用したフェッチ
 
-If the URI's "cache" field has the value "true", then the fetcher cache is in
-effect. If a URI is encountered for the first time (for the same user), it is
-first downloaded into the cache, then copied to the sandbox directory from
-there. If the same URI is encountered again, and a corresponding cache file is
-resident in the cache or still en route into the cache, then downloading is
-omitted and the fetcher proceeds directly to copying from the cache. Competing
-requests for the same URI simply wait upon completion of the first request that
-occurs. Thus every URI is downloaded at most once (per user) as long as it is
-cached.
+URIの「cache」フィールドの値が「true」の場合、フェッチャーキャッシュが有効になります。あるURIに初めて遭遇した場合（同じユーザーの場合）、まずキャッシュにダウンロードされ、そこからサンドボックスのディレクトリにコピーされます。同じ URI に再び遭遇し、対応するキャッシュファイルがキャッシュに常駐しているか、またはキャッシュに入る途中であれば、ダウンロードは省略され、フェッチャーは直接キャッシュからのコピーに進みます。同じURIに対する競合するリクエストは、最初に発生したリクエストの完了を待つだけである。このように、すべてのURIは、キャッシュされている限り、（ユーザごとに）最大1回だけダウンロードされる。
 
-Every cache file stays resident for an unspecified amount of time and can be
-removed at the fetcher's discretion at any moment, except while it is in direct
-use:
+すべてのキャッシュファイルは、不特定の時間常駐し、直接使用されている間を除いて、いつでもフェッチャーの判断で削除することができます。:
 
-- It is still being downloaded by this fetch procedure.
-- It is still being downloaded by a concurrent fetch procedure for a different
-  task.
-- It is being copied or extracted from the cache.
+* このフェッチ・プロシージャによってまだダウンロードされています。
+* 別のタスクの同時フェッチ・プロシージャによって、まだダウンロードされています。
+* キャッシュからコピーまたは抽出されています。
 
-Once a cache file has been removed, the related URI will thereafter be treated
-as described above for the first encounter.
+いったんキャッシュファイルが削除されると、関連する URI はその後、最初に遭遇したときに上記のように処理されることになります。
 
-Unfortunately, there is no mechanism to refresh a cache entry in the current
-experimental version of the fetcher cache. A future feature may force updates
-based on checksum queries to the URI.
+残念ながら、フェッチャーキャッシュの現在の実験的なバージョンには、キャッシュエントリをリフレッシュするメカニズムはありません。将来の機能では、URI へのチェックサムクエリに基づいて更新を強制することができるかもしれません。
 
-Recommended practice for now:
+現時点での推奨事項
 
-The framework should start using a fresh unique URI whenever the resource's
-content has changed.
+フレームワークは、リソースのコンテンツが変更されたときにはいつでも、新しい一意のURIの使用を開始すべきです。
 
-### Determining resource sizes
+### リソースサイズの決定
 
-Before downloading a resource to the cache, the fetcher first determines the
-size of the expected resource. It uses these methods depending on the nature of
-the URI.
+リソースをキャッシュにダウンロードする前に、フェッチャーはまず、予想されるリソースのサイズを決定します。URIの性質に応じて、これらの方法を使用します。
 
-- Local file sizes are probed with systems calls (that follow symbolic links).
-- HTTP/HTTPS URIs are queried for the "content-length" field in the header. This
-  is performed by `curl`. The reported asset size must be greater than zero or
-  the URI is deemed invalid.
-- FTP/FTPS is not supported at the time of writing.
-- Everything else is queried by the local HDFS client.
+* ローカルファイルのサイズは、（シンボリックリンクをたどる）システムコールで探ります。
+* HTTP/HTTPSのURIは、ヘッダの「content-length」フィールドを照会します。これは、`curl`によって実行されます。報告されたアセットサイズがゼロより大きくなければ、そのURIは無効とみなされます。
+* FTP/FTPS は、執筆時点ではサポートされていません。
+* その他のすべては、ローカルのHDFSクライアントによって照会されます。
 
-If any of this reports an error, the fetcher then falls back on bypassing the
-cache as described above.
+これらのどれかがエラーを報告した場合、フェッチャーは上述のようにキャッシュをバイパスすることに戻ります。
 
-WARNING: Only URIs for which download sizes can be queried up front and for
-which accurate sizes are reported reliably are eligible for any fetcher cache
-involvement. If actual cache file sizes exceed the physical capacity of the
-cache directory in any way, all further agent behavior is completely
-unspecified. Do not use any cache feature with any URI for which you have any
-doubts!
+警告: ダウンロードサイズを前もって問い合わせることができ、正確なサイズが確実に報告されるURIのみが、フェッチャーのキャッシュに関与する資格があります。実際のキャッシュファイルのサイズが何らかの方法でキャッシュディレクトリの物理的な容量を超えた場合、それ以降のエージェントの動作は全く規定されていません。疑わしい URI に対しては、キャッシュ機能を使用しないでください。
 
-To mitigate this problem, cache files that have been found to be larger than
-expected are deleted immediately after downloading and delivering the
-requested content to the sandbox. Thus exceeding total capacity at least
-does not accumulate over subsequent fetcher runs.
+この問題を軽減するために、予想以上に大きいことが判明したキャッシュファイルは、要求されたコンテンツをダウンロードしてサンドボックスに配信した直後に削除されます。そのため、少なくとも総容量の超過が、その後のフェッチャーの実行で蓄積されることはありません。
 
-If you know for sure that size aberrations are within certain limits you can
-specify a cache directory size that is sufficiently smaller than your actual
-physical volume and fetching should work.
+サイズの異常が一定の範囲内であることが確実に分かっている場合は、実際の物理ボリュームよりも十分に小さいキャッシュディレクトリのサイズを指定すれば、フェッチが機能します。
 
-In case of cache files that are smaller then expected, the cache will
-dynamically adjust its own bookkeeping according to actual sizes.
+キャッシュファイルのサイズが予想よりも小さかった場合、キャッシュは実際のサイズに応じて動的に調整します。
 
-### Cache eviction
+### キャッシュの排除
 
-After determining the prospective size of a cache file and before downloading
-it, the cache attempts to ensure that at least as much space as is needed for
-this file is available and can be written into. If this is immediately the case,
-the requested amount of space is simply marked as reserved. Otherwise, missing
-space is freed up by "cache eviction". This means that the cache removes files
-at its own discretion until the given space target is met or exceeded.
+キャッシュファイルの予想されるサイズを決定した後、ダウンロードする前に、キャッシュは少なくともそのファイルに必要な容量が利用可能であり、書き込めることを確認しようとします。その結果、必要な容量が確保されていない場合は、単に予約済みと表示されます。そうでない場合、不足しているスペースは「キャッシュエヴィクション」によって解放されます。つまり、キャッシュは、指定されたスペース目標を満たすか超えるまで、自らの判断でファイルを削除します。
 
-The eviction process fails if too many files are in use and therefore not
-evictable or if the cache is simply too small. Either way, the fetcher then
-falls back on bypassing the cache for the given URI as described above.
+あまりにも多くのファイルが使用されていて立ち退きができない場合や、単にキャッシュが小さすぎる場合には、立ち退き処理は失敗します。いずれにしても、フェッチャーは上述のように、与えられたURIのキャッシュをバイパスすることに戻ります。
 
-If multiple evictions happen concurrently, each of them is pursuing its own
-separate space goals. However, leftover freed up space from one effort is
-automatically awarded to others.
+複数のエヴィジョンが同時に発生した場合、それぞれのエヴィジョンは個別のスペース目標を達成することになります。しかし、ある作業で残った解放されたスペースは、自動的に他の作業に与えられます。
 
-## HTTP and SOCKS proxy settings
+## HTTPおよびSOCKSプロキシの設定
+時には、プロキシを使用してファイルをダウンロードすることが望ましい場合があります。Mesos フェッチャーは、HTTP/HTTPS/FTP/FTPS サーバーからコンテンツをダウンロードするために libcurl を内部で使用しており、特定の環境変数が設定されている場合、libcurl は自動的にプロキシを使用することができます。
 
-Sometimes it is desirable to use a proxy to download the file. The Mesos
-fetcher uses libcurl internally for downloading content from
-HTTP/HTTPS/FTP/FTPS servers, and libcurl can use a proxy automatically if
-certain environment variables are set.
+それぞれの環境変数名は `[protocol]_proxy` で、`protocol` は socks4, socks5, http, https のいずれかです。
 
-The respective environment variable name is `[protocol]_proxy`, where
-`protocol` can be one of socks4, socks5, http, https.
+例えば、`http_proxy`という環境変数の値は、httpのコンテンツを取得するためのプロキシとして使用され、`https_proxy`はhttpsのコンテンツを取得するためのプロキシとして使用されます。これらの変数名はすべて小文字であることに注意してください。
 
-For example, the value of the `http_proxy` environment variable would be used
-as the proxy for fetching http contents, while `https_proxy` would be used for
-fetching https contents. Pay attention that these variable names must be
-entirely in lower case.
+proxy変数の値は、`[protocol://][user:password@]machine[:port]`という形式で、`protocol`にはsocks4, socks5, http, httpsのいずれかを指定します。
 
-The value of the proxy variable is of the format
-`[protocol://][user:password@]machine[:port]`, where `protocol` can be one of
-socks4, socks5, http, https.
+プロキシを使用した FTP/FTPS リクエストでは、HTTP/HTTPS プロキシも使用されます。一般的には、これにより利用可能なFTPプロトコル操作が制限されますが、フェッチャーが使用するものはすべてサポートされています。
 
-FTP/FTPS requests with a proxy also make use of an HTTP/HTTPS proxy. Even
-though in general this constrains the available FTP protocol operations,
-everything the fetcher uses is supported.
-
-Your proxy settings can be placed in `/etc/default/mesos-slave`. Here is an
-example:
+プロキシの設定は、`/etc/default/mesos-slave`に記述します。以下はその例です。:
 
 ```
 export http_proxy=https://proxy.example.com:3128
 export https_proxy=https://proxy.example.com:3128
 ```
+フェッチャーが採用しているユーティリティプログラム`mesos-fetcher`はmesos-agentの子なので、フェッチャーはこれらの環境変数の設定を拾います。
 
-The fetcher will pick up these environment variable settings since the utility
-program `mesos-fetcher` which it employs is a child of mesos-agent.
+詳細については、[libcurlのマニュアル](http://curl.haxx.se/libcurl/c/libcurl-tutorial.html)をご参照ください。
 
-For more details, please check the
-[libcurl manual](http://curl.haxx.se/libcurl/c/libcurl-tutorial.html).
+## エージェント フラグ
+これらのフラグは、デフォルト以外の値を明示的に設定するか、運用時にはフェッチャーキャッシュを使用しないことを強くお勧めします。
 
-## Agent flags
+* "fetcher_cache_size": デフォルト値：テスト用には十分です。
+* "fetcher_cache_dir": デフォルト値: "work_dir" フラグで指定されたディレクトリ内のどこかで、テスト用には問題ありません。
 
-It is highly recommended to set these flags explicitly to values other than
-their defaults or to not use the fetcher cache in production.
+推奨環境:
 
-- "fetcher_cache_size", default value: enough for testing.
-- "fetcher_cache_dir", default value: somewhere inside the directory specified
-  by the "work_dir" flag, which is OK for testing.
+* フェッチャーキャッシュとして別のボリュームを使用する。フェッチャーキャッシュのディレクトリとして、基礎となるボリュームの領域を他の貢献者と競合するディレクトリを指定しないでください。
+* エージェントのキャッシュディレクトリサイズフラグを、実際のキャッシュボリュームの物理サイズよりも小さく設定します。特に、すべてのフレームワークが準拠しているかどうかはっきりしない場合は、安全マージンを使用する。
 
-Recommended practice:
+究極の解決策:
 
-- Use a separate volume as fetcher cache. Do not specify a directory as fetcher
-  cache directory that competes with any other contributor for the underlying
-  volume's space.
-- Set the cache directory size flag of the agent to less than your actual cache
-  volume's physical size. Use a safety margin, especially if you do not know
-  for sure if all frameworks are going to be compliant.
+各エージェントの "fetcher_cache_size"フラグを0バイトに設定することで、フェッチャーキャッシュを完全に無効にすることができます。
 
-Ultimate remedy:
+## 将来の機能
+以下の機能は、比較的容易に追加実装することができます。
 
-You can disable the fetcher cache entirely on each agent by setting its
-"fetcher_cache_size" flag to zero bytes.
+* リソースのチェックサムに基づいて、キャッシュの更新を行います。たとえば、HTTP ヘッダーの md5 フィールドを照会して、ある URL のリソースが変更されたかどうかを判断します。
+* HTTP の cache-control ディレクティブを尊重します。
+* ftp/ftpsのキャッシュを有効にする。
+* シンボリックリンクまたはバインドマウントを使用して、キャッシュされたリソースを読み取り専用でサンドボックスに投影します。
+* 抽出したアーカイブをサンドボックスにコピーするかどうかを選択できます。
+* 抽出したアーカイブをサンドボックスにコピーするかどうかを選択できます。
+* キャッシュファイルのユーザごとの分離を任意とする。
+* キャッシュを迂回してダウンロードする際にコンテンツを抽出する。
+* 後続のタスクのためにリソースをプリフェッチします。これは、現在のタスクの実行と同時に、それ自身のリソースを取得した直後に行うことができます。
 
-## Future Features
-The following features would be relatively easy to implement additionally.
-
-- Perform cache updates based on resource check sums. For example, query the md5
-  field in HTTP headers to determine when a resource at a URL has changed.
-- Respect HTTP cache-control directives.
-- Enable caching for ftp/ftps.
-- Use symbolic links or bind mounts to project cached resources into the
-  sandbox, read-only.
-- Have a choice whether to copy the extracted archive into the sandbox.
-- Have a choice whether to delete the archive after extraction bypassing the
-  cache.
-- Make the segregation of cache files by user optional.
-- Extract content while downloading when bypassing the cache.
-- Prefetch resources for subsequent tasks. This can happen concurrently with
-  running the present task, right after fetching its own resources.
-
-## Implementation Details
-The [Mesos Fetcher Cache Internals](fetcher-cache-internals.md) describes how the fetcher cache is implemented.
+## 実装内容
+[Mesos Fetcher Cache Internals](fetcher-cache-internals.md)では、フェッチャーキャッシュの実装方法について説明しています。

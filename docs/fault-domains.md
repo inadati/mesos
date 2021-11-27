@@ -3,104 +3,45 @@ title: Apache Mesos - Domains and Regions
 layout: documentation
 ---
 
-# Regions and Fault Domains
+# リージョンとフォールトドメイン
+Mesos 1.5では、Mesosマスターとエージェントをドメインに配置することができます。ドメインとは、いくつかの特徴を共有するマシンの論理的なグループです。
 
-Starting with Mesos 1.5, it is possible to place Mesos masters and agents into
-*domains*, which are logical groups of machines that share some characteristics.
+現在、サポートされているのは障害ドメインのみで、これは同様の障害特性を持つマシンのグループを指します。
 
-Currently, fault domains are the only supported type of domains, which are
-groups of machines with similar failure characteristics.
+フォールト・ドメインは、リージョンとゾーンの2レベルの階層で構成されています。フォールトドメインから物理インフラへのマッピングは、オペレータの設定次第ですが、同じゾーンにあるマシンは互いに低レイテンシーであることが推奨されます。
 
-A fault domain is a 2 level hierarchy of regions and zones. The mapping from
-fault domains to physical infrastructure is up to the operator to configure,
-although it is recommended that machines in the same zones have low latency to
-each other.
+クラウド環境では、リージョンとゾーンは、ほとんどのクラウドプロバイダーが提供する「リージョン」と「アベイラビリティー・ゾーン」という概念にそれぞれマッピングすることができます。また、オンプレミス環境では、リージョンとゾーンはそれぞれデータセンターとラックに対応します。
 
-In cloud environments, regions and zones can be mapped to the "region" and
-"availability zone" concepts exposed by most cloud providers, respectively.
-In on-premise deployments, regions and zones can be mapped to data centers and
-racks, respectively.
+スケジューラーは、ネットワークを多用するワークロードを同じドメイン内に配置することで、パフォーマンスを向上させることができます。逆に、あるドメインのホストに発生した単一の障害は、同じドメインの他のホストにも影響を与える可能性が高いため、スケジューラーは高可用性を必要とするワークロードを複数のドメインに配置することを好む場合があります。例えば、1つのラック内のすべてのホストが同時に電源やネットワーク接続を失う可能性があります。
 
-Schedulers may prefer to place network-intensive workloads in the same domain,
-as this may improve performance. Conversely, a single failure that affects a
-host in a domain may be more likely to affect other hosts in the same domain;
-hence, schedulers may prefer to place workloads that require high availability
-in multiple domains. For example, all the hosts in a single rack might lose
-power or network connectivity simultaneously.
-
-The `--domain` flag can be used to specify the fault domain of a master or
-agent node. The value of this flag must be a file path or a JSON dictionary
-with the key `fault_domain` and subkeys `region` and `zone` mapping to
-arbitrary strings:
+マスターノードまたはエージェントノードのフォールトドメインを指定するには、`--domain` フラグを使用します。このフラグの値は、ファイルパスまたは、キー `fault_domain` とサブキー `region` および `zone` が任意の文字列にマッピングされた JSON 辞書でなければなりません。:
 
     mesos-master --domain='{"fault_domain": {"region": {"name":"eu"}, "zone": { "name":"rack1"}}}'
 
     mesos-agent  --domain='{"fault_domain": {"region": {"name":"eu"}, "zone": {"name":"rack2"}}}'
 
-Frameworks can learn about the domain of an agent by inspecting the `domain`
-field in the received offer, which contains a `DomainInfo` that has the
-same structure as the JSON dictionary above.
+フレームワークは、受信したオファーの domain フィールドを調べることで、エージェントのドメインを知ることができます。この `domain` フィールドには、上記の JSON 辞書と同じ構造を持つ `DomainInfo` が含まれています。
 
+# 制約事項
 
-# Constraints
+マスターとエージェントにフォールトドメインを設定する際には、以下の制約に従わなければなりません。:
+* mesos masterにドメインが設定されていない場合、ドメインを持つエージェントからの接続試行を拒否します。これは、マスターが、この場合にエージェントがリモートになるかどうかを判断できないために行われます。
 
-When configuring fault domains for the masters and agents, the following
-constraints must be obeyed:
+* ドメインが設定されていないエージェントは、マスターと同じドメインにいるものとみなされます。この動作を望まない場合は、マスターの `--require_agent_domain` フラグを使用して、ドメインが設定されていないエージェントによるすべての登録の試みをマスターが拒否することにより、すべてのエージェントにドメインが設定されていることを強制することができる。
 
- * If a mesos master is not configured with a domain, it will reject connection
-   attempts from agents with a domain.
+* 1つのマスターにドメインが設定されている場合、他のすべてのマスターは、 リージョン間のクォーラム書き込みを避けるために、同じ「リージョン」にいなければなりません。高可用性のためには、その地域内の異なるゾーンに配置することが推奨される。
 
-   This is done because the master is not able to determine whether or not the
-   agent would be remote in this case.
+* デフォルトのDRFリソースアロケータは、マスターと同じリージョンのエージェントからしかリソースをオファーしません。すべてのリージョンからオファーを受け取るには、フレームワークはそのFrameworkInfoに`REGION_AWARE`ケイパビリティビットを設定する必要があります。
 
- * Agents with no configured domain are assumed to be in the same domain as the
-   master.
+# 例
+これらの概念を説明するために、短い例を挙げます。WayForward Technologiesは、ユーザーが欲しいものを購入できるウェブサイトを運営しています。
 
-   If this behaviour isn't desired, the `--require_agent_domain` flag on the
-   master can be used to enforce that domains are configured on all agents by
-   having the master reject all registration attempts by agents without a
-   configured domain.
+そのために、サンフランシスコにデータセンターを所有し、その中でいくつかのカスタムMesosフレームワークを稼働させています。データセンター内のすべてのエージェントは、同じリージョン`sf`で設定されており、データセンター内の個々のラックはゾーンとして使用されています。
 
- * If one master is configured with a domain, all other masters must be in the
-   same "region" to avoid cross-region quorum writes. It is recommended to put
-   them in different zones within that region for high availability.
+3台のメソスマスターは、データセンター内の異なるサーバーラックに設置されており、ラック全体の電源やネットワーク接続が失われた場合でも、十分な分離性を確保しつつ、クォーラム書き込みに必要な低遅延を実現しています。
 
- * The default DRF resource allocator will only offer resources from agents in
-   the same region as the master. To receive offers from all regions, a
-   framework must set the `REGION_AWARE` capability bit in its FrameworkInfo.
+提供されるサービスの1つに、会社のインベントリのリアルタイム表示があります。このサービスを提供するフレームワークは、すべてのタスクをデータベースサーバと同じゾーンに配置し、高速かつ低レイテンシーのリンクを利用して、常に最新の結果を表示できるようにしています。
 
+ピーク時には、Webサイトの運用に必要なコンピューティングパワーがデータセンターのキャパシティを超えてしまうこともあります。不必要なハードウェアの購入を避けるため、WayForward TechnologiesはサードパーティのクラウドプロバイダーであるTPCと契約した。このプロバイダーのマシンは、異なるリージョンの`tpc`に配置され、ゾーンはTPCが提供するアベイラビリティー・ゾーンに対応するように構成されています。すべての関連するフレームワークは、`FrameworkInfo`の`REGION_AWARE`ビットが更新され、スケジューリング・ロジックが更新されて、必要に応じてクラウドでタスクをスケジューリングできるようになりました。
 
-# Example
-
-A short example will serve to illustrate these concepts. WayForward Technologies
-runs a successful website that allows users to purchase things that they want
-to have.
-
-To do this, it owns a data center in San Francisco, in which it runs a number of
-custom Mesos frameworks. All agents within the data center are configured with
-the same region `sf`, and the individual racks inside the data center are used
-as zones.
-
-The three mesos masters are placed in different server racks in the data center,
-which gives them enough isolation to withstand events like a whole rack losing
-power or network connectivity but still have low-enough latency for
-quorum writes.
-
-One of the provided services is a real-time view of the company's inventory.
-The framework providing this service is placing all of its tasks in the same
-zone as the database server, to take advantage of the high-speed, low-latency
-link so it can always display the latest results.
-
-During peak hours, it might happen that the computing power required to operate
-the website exceeds the capacity of the data center. To avoid unnecessary
-hardware purchases, WayForward Technologies contracted with a third-party cloud
-provider TPC. The machines from this provider are placed in a different
-region `tpc`, and the zones are configured to correspond to the availability
-zones provided by TPC. All relevant frameworks are updated with the
-`REGION_AWARE` bit in their `FrameworkInfo` and their scheduling logic is
-updated so that they can schedule tasks in the cloud if required.
-
-Non-region aware frameworks will now only receive offers from agents within
-the data center, where the master nodes reside. Region-aware frameworks are
-supposed to know when and if they should place their tasks in the data center
-or with the cloud provider.
+リージョンを意識しないフレームワークは、マスターノードが存在するデータセンター内のエージェントからのみオファーを受け取ります。リージョンアウェアのフレームワークは、いつ、どのタイミングでタスクをデータセンターに置くべきか、あるいはクラウド・プロバイダーに置くべきかを知ることができます。

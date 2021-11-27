@@ -3,20 +3,18 @@ title: Apache Mesos - Performance Profiling
 layout: documentation
 ---
 
-# Performance Profiling
+# パフォーマンス・プロファイリング
 
-This document over time will be home to various guides on how to use various profiling tools to do performance analysis of Mesos.
+このドキュメントには、Mesosのパフォーマンス分析を行うための様々なプロファイリングツールの使用方法に関する様々なガイドが掲載されています。
 
 ## Flamescope
-
-[Flamescope](https://github.com/Netflix/flamescope) is a visualization tool for exploring different time ranges as [flamegraphs](https://github.com/brendangregg/FlameGraph). In order to use the tool, you first need to obtain stack traces, here's how to obtain a 60 second recording of the mesos master process at 100 hertz using Linux perf:
+[Flamescope](https://github.com/Netflix/flamescope)は、異なる時間範囲を[flamegraphs](https://github.com/brendangregg/FlameGraph)として探索するための可視化ツールです。このツールを使うためには、まずスタックトレースを取得する必要があります。ここでは、Linuxのperfを使って、100ヘルツのmesos masterプロセスの60秒の記録を取得する方法を紹介します。:
 
 ```
 $ sudo perf record --freq=100 --no-inherit --call-graph dwarf -p <mesos-master-pid> -- sleep 60
 $ sudo perf script --header | c++filt > mesos-master.stacks
 $ gzip mesos-master.stacks
 ```
+パフォーマンスデータの解析に協力を求めたい場合は、`mesos-master.stacks.gz`を一般にアクセス可能な場所にアップロードし、解析用に`dev@mesos.apache.org` でファイルを作成するか、[slack](http://mesos.slack.com)の#performanceチャンネルにファイルを送ってください。
 
-If you'd like to solicit help in analyzing the performance data, upload the `mesos-master.stacks.gz` to a publicly accessible location and file with `dev@mesos.apache.org` for analysis, or send the file over [slack](http://mesos.slack.com) to the #performance channel.
-
-Alternatively, to do the analysis yourself, place mesos-master.stacks into the `examples` folder of a flamescope git checkout.
+また、自分で解析を行う場合は、mesos-master.stacksをflamescopeのgit checkoutの`examples`フォルダに入れてください。

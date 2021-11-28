@@ -3,186 +3,109 @@ title: Apache Mesos - Memory Profiling
 layout: documentation
 ---
 
-# Memory Profiling with Mesos and Jemalloc
+# MesosとJemallocによるメモリ・プロファイリング
+Linuxシステムでは、Mesosは汎用アロケータ[jemalloc](http://jemalloc.net)のメモリ・プロファイリング機能を活用して、メモリ関連の問題を調査するための強力なデバッグ・ツールを提供しています。
 
-On Linux systems, Mesos is able to leverage the memory-profiling capabilities of
-the [jemalloc](http://jemalloc.net) general-purpose allocator to provide
-powerful debugging tools for investigating memory-related issues.
+これには、現在のメモリ使用量の詳細なリアルタイム統計や、個々の割り当ての場所と頻度に関する情報が含まれます。
 
-These include detailed real-time statistics of the current memory usage, as well
-as information about the location and frequency of individual allocations.
-
-This generally works by having libprocess detect at runtime whether the current
-process is using jemalloc as its memory allocator, and if so enable a number of
-HTTP endpoints described below that allow operators to generate the desired data
-at runtime.
-
+これは一般的に、現在のプロセスがメモリアロケータとして jemalloc を使用しているかどうかを libprocess が実行時に検出し、使用している場合は、オペレータが実行時に必要なデータを生成できるように、以下に説明するいくつかの HTTP エンドポイントを有効にすることで動作します。
 
 <a name="requirements"></a>
 ## Requirements
 
-A prerequisite for memory profiling is a suitable allocator. Currently only
-jemalloc is supported, which can be connected via one of the following ways.
+メモリプロファイリングの前提条件として、適切なアロケータが必要です。現在はjemallocのみがサポートされており、以下のいずれかの方法で接続することができます。
 
-The recommended method is to specify the `--enable-jemalloc-allocator`
-compile-time flag, which causes the `mesos-master` and `mesos-agent` binaries
-to be statically linked against a bundled version of jemalloc that will be
-compiled with the correct compile-time flags.
+推奨される方法は、`--enable-jemalloc-allocator`コンパイル時フラグを指定することです。これにより、`mesos-master`および`mesos-agent`バイナリは、正しいコンパイル時フラグでコンパイルされたjemallocのバンドルバージョンと静的にリンクされます。
 
-Alternatively and analogous to other bundled dependencies of Mesos, it is of
-course also possible to use a _suitable_ custom version of jemalloc with the
-`--with-jemalloc=</path-to-jemalloc>` flag.
+また、Mesosの他のバンドルされた依存関係と同様に、`--with-jemalloc=</path-to-jemalloc>`フラグを使用して、適切なカスタムバージョンのjemallocを使用することももちろん可能です。
 
-**NOTE:** Suitable here means that jemalloc should have been built with the
-`--enable-stats` and `--enable-prof` flags, and that the string
-`prof:true;prof_active:false` is part of the malloc configuration. The latter
-condition can be satisfied either at configuration or at run-time, see the
-section on `MALLOC_CONF` below.
+注：ここでの適切とは、jemallocが`--enable-stats`および`--enable-prof`フラグを付けてビルドされていること、および文字列`prof:true;prof_active:false`がmallocの設定の一部であることを意味します。後者の条件は、設定時または実行時に満たすことができます。後述の`MALLOC_CONF`のセクションを参照してください。
 
-The third way is to use the `LD_PRELOAD` mechanism to preload a `libjemalloc.so`
-shared library that is present on the system at runtime. The `MemoryProfiler`
-class in libprocess will automatically detect this and enable its memory
-profiling support.
+3 つ目の方法は、`LD_PRELOAD` メカニズムを使用して、実行時にシステムに存在する `libjemalloc.so` 共有ライブラリをプリロードすることです。libprocessの`MemoryProfiler`クラスは自動的にこれを検出して、メモリプロファイリングサポートを有効にします。
 
-The generated profile dumps will be written to a random directory under `TMPDIR`
-if set, otherwise in a subdirectory of `/tmp`.
+生成されたプロファイルダンプは、設定されていれば `TMPDIR` の下のランダムなディレクトリに書き込まれ、そうでなければ `/tmp` のサブディレクトリに書き込まれます。
 
-Finally, note that since jemalloc was designed to be used in highly concurrent
-allocation scenarios, it can improve performance over the default system
-allocator. In this case, it can be beneficial to build Mesos with jemalloc even
-if there is no intention to use the memory profiling functionality.
+最後に、jemallocは高度に同時進行する割り当てシナリオで使用するように設計されているため、デフォルトのシステムアロケータよりもパフォーマンスが向上することがあることに注意してください。この場合、メモリプロファイリング機能を使用する意図がなくても、jemallocを使用してMesosを構築することは有益です。
 
-## Usage
+## 使用方法
+jemallocから収集できるデータには、メモリ統計とヒーププロファイリング情報の2つの独立したセットがあります。
 
-There are two independent sets of data that can be collected from jemalloc:
-memory statistics and heap profiling information.
+以下に説明するエンドポイントを使用するには、[jemallocアロケータ要件](#requirements)と、オプション`--memory_profiling=true`で`mesos-agent`または`mesos-master`バイナリを起動する必要があります（または、libprocessを使用する他のバイナリでは、環境変数`LIBPROCESS_MEMORY_PROFILING=true`を設定する必要があります）。
 
-Using any of the endpoints described below
-[requires the jemalloc allocator](#requirements) and starting the `mesos-agent`
-or `mesos-master` binary with the option `--memory_profiling=true` (or setting
-the environment variable `LIBPROCESS_MEMORY_PROFILING=true` for other binaries
-using libprocess).
+### メモリの統計情報
 
+`/statistics`エンドポイントは、現在割り当てられているバイト数や、これらの割り当てのサイズ分布など、メモリ使用量に関する正確な統計情報をJSON形式で返します。
 
-### Memory Statistics
-
-The `/statistics` endpoint returns exact statistics about the memory usage in
-JSON format, for example the number of bytes currently allocated and the size
-distribution of these allocations.
-
-It takes no parameters and will return the results in JSON format:
+パラメータはなく、JSON形式で結果が返されます。:
 
     http://example.org:5050/memory-profiler/statistics
 
-Be aware that the returned JSON is quite large, so when accessing this endpoint
-from a terminal, it is advisable to redirect the results into a file.
+返されるJSONはかなり大きいので、ターミナルからこのエンドポイントにアクセスする場合は、結果をファイルにリダイレクトすることをお勧めします。
 
 
-### Heap Profiling
+### ヒープのプロファイリング
+jemallocによるプロファイリングは、設定された確率分布に従って`malloc()`の呼び出しからサンプリングを行い、サンプリングされた呼び出しのスタックトレースを別のメモリ領域に保存します。これらは、ファイルシステム上のファイル、いわゆるヒーププロファイルにダンプすることができます。
 
-The profiling done by jemalloc works by sampling from the calls to `malloc()`
-according to a configured probability distribution, and storing stack traces for
-the sampled calls in a separate memory area. These can then be dumped into files
-on the filesystem, so-called heap profiles.
-
-To start a profiling run one would access the `/start` endpoint:
+プロファイリングの実行を開始するには、`/start` エンドポイントにアクセスします。:
 
     http://example.org:5050/memory-profiler/start?duration=5mins
 
-followed by downloading one of the generated files described below after the
-duration has elapsed. The remaining time of the current profiling run can be
-verified via the `/state` endpoint:
+続いて、時間が経過した後、以下に説明する生成ファイルの1つをダウンロードします。現在のプロファイリング実行の残り時間は、`/state`エンドポイントで確認できます。:
 
     http://example.org:5050/memory-profiler/state
 
-Since profiling information is stored process-global by jemalloc, only a single
-concurrent profiling run is allowed. Additionally, only the results of the most
-recently finished run are stored on disk.
+プロファイリング情報はjemallocによってプロセス・グローバルに保存されるため、1回のプロファイリングの同時実行しかできません。さらに、直近に終了した実行の結果のみがディスクに保存されます。
 
-The profile collection can also be stopped early with the `/stop` endpoint:
+プロファイル・コレクションは、`/stop`エンドポイントで早期に停止することもできます。:
 
     http://example.org:5050/memory-profiler/stop
 
 To analyze the generated profiling data, the results are offered in three
 different formats.
 
-#### Raw profile
+#### 生のプロファイル
 
     http://example.org:5050/memory-profiler/download/raw
 
-This returns a file in a plain text format containing the raw backtraces
-collected, i.e., lists of memory addresses. It can be interactively analyzed
-and rendered using the `jeprof` tool provided by the jemalloc project. For more
-information on this file format, check out [the official jemalloc
-documentation](http://jemalloc.net/jemalloc.3.html#heap_profile_format).
+これは、収集された生のバックトレース、すなわち、メモリアドレスのリストを含むプレーンテキスト形式のファイルを返します。このファイルは、jemallocプロジェクトで提供されている`jeprof`ツールを使って、インタラクティブに分析したり、レンダリングしたりすることができます。このファイルフォーマットの詳細については、[jemallocの公式ドキュメント](http://jemalloc.net/jemalloc.3.html#heap_profile_format)をご覧ください。
 
-#### Symbolized profile
+#### 象徴的なプロファイル
 
     http://example.org:5050/memory-profiler/download/text
 
-This is similar to the raw format above, except that `jeprof` is called on the
-host machine to attempt to read symbol information from the current binary and
-replace raw memory addresses in the profile by human-readable symbol names.
+これは、上記の raw フォーマットと似ていますが、ホスト・マシン上で `jeprof` が呼び出され、現在のバイナリからシンボル情報を読み取って、プロファイル内の生のメモリ・アドレスを人間が読めるシンボル名に置き換えることを試みます。
 
-Usage of this endpoint requires that `jeprof` is present on the host machine
-and on the `PATH`, and no useful information will be generated unless the binary
-contains symbol information.
+このエンドポイントを使用するには、`jeprof`がホスト・マシン上および`PATH`上に存在する必要があり、バイナリにシンボル情報が含まれていない限り、有用な情報は生成されません。
 
 #### Call graph
 
     http://example.org:5050/memory-profiler/download/graph
 
-This endpoint returns an image in SVG format that shows a graphical
-representation of the samples backtraces.
+このエンドポイントは、サンプルのバックトレースをグラフィカルに表現したSVG形式の画像を返します。
 
-Usage of this endpoint requires that `jeprof` and `dot` are present on the host
-machine and on the `PATH` of mesos, and no useful information will be generated
-unless the binary contains symbol information.
+このエンドポイントを使用するには、ホストマシンとmesosの`PATH`に`jeprof`と`dot`が存在する必要があり、バイナリにシンボル情報が含まれていないと有用な情報は生成されません。
 
-#### Overview
+#### 概要
+これらのうちどれが必要かは、アプリケーションの展開状況や調査対象となるバグの状況によって異なります。
 
-Which of these is needed will depend on the circumstances of the application
-deployment and of the bug that is investigated.
+例えば、コールグラフは情報を視覚的にすぐに役立つ形で表示しますが、デフォルト以外の出力オプションが必要な場合、フィルタリングや後処理が困難です。
 
-For example, the call graph presents information in a visual, immediately useful
-form, but is difficult to filter and post-process if non-default output options
-are desired.
+一方、多くのdebian-like環境では、スペースを節約するためにシンボル情報はデフォルトでバイナリから取り除かれ、別のパッケージで出荷されます。このような環境では、Mesosを実行しているホストに追加パッケージをインストールすることが許可されていない場合、生のプロファイルを保存し、ローカルでシンボル情報でリッチ化することになります。
 
-On the other hand, in many debian-like environments symbol information is by
-default stripped from binaries to save space and shipped in separate packages.
-In such an environment, if it is not permitted to install additional packages on
-the host running Mesos, one would store the raw profiles and enrich them with
-symbol information locally.
+## Jeprof のインストール
+上述のとおり、`/download/text`および`/download/graph`エンドポイントでは、ホストシステムに`jeprof`プログラムがインストールされている必要があります。可能であれば、システム・パッケージ・マネージャを介して`jeprof`をインストールすることをお勧めし、通常はjemalloc自体と一緒にパッケージされています。
 
-
-## Jeprof Installation
-
-As described above, the `/download/text` and `/download/graph` endpoints require
-the `jeprof` program installed on the host system. Where possible, it is
-recommended to install `jeprof` through the system package manager, where it is
-usually packaged alongside with jemalloc itself.
-
-Alternatively, a copy of the script can be found under
-`3rdparty/jemalloc-5.0.1/bin/jeprof` in the build directory, or can be
-downloaded directly from the internet using a command like:
+また、スクリプトのコピーは、ビルドディレクトリーの`3rdparty/jemalloc-5.0.1/bin/jeprof`の下にあり、次のようなコマンドでインターネットから直接ダウンロードすることもできます。:
 
     $ curl https://raw.githubusercontent.com/jemalloc/jemalloc/dev/bin/jeprof.in | sed s/@jemalloc_version@/5.0.1/ >jeprof
 
-Note that `jeprof` is just a perl script that post-processes the raw profiles.
-It has no connection to the jemalloc library besides being distributed in the
-same package. In particular, it is generally not required to have matching
-versions of jemalloc and `jeprof`.
+`jeprof`は、生のプロファイルを後処理する単なるPerlスクリプトであることに注意してください。`jeprof`は、同じパッケージで配布されていること以外に、jemallocライブラリとは何の関係もありません。特に、jemallocと`jeprof`のバージョンが一致している必要は、一般的にはありません。
 
-If `jeprof` is installed manually, one also needs to take care to install the
-necessary dependencies. In particular, this include the `perl` interpreter to
-execute the script itself and the `dot` binary to generate graph files.
+`jeprof`を手動でインストールする場合は、必要な依存関係をインストールすることにも注意する必要があります。具体的には、スクリプトを実行するための`Perl`インタープリタや、グラフファイルを生成するための`dot`バイナリなどがあります。
 
+## コマンドラインでの使い方
 
-## Command-line Usage
-
-In some circumstances, it might be desired to automate the downloading of heap
-profiles by writing a simple script. A simple example for how this might look
-like this:
+状況によっては、簡単なスクリプトを書いて、ヒーププロファイルのダウンロードを自動化したい場合があります。簡単な例を挙げると、次のようになります。:
 
     #!/bin/bash
 
@@ -193,37 +116,21 @@ like this:
     sleep $((${SECONDS} + 1))
     wget ${HOST}/memory-profiler/download/raw
 
-A more sophisticated script would additionally store the `id` value returned by
-the call to `/start` and pass it as a paremter to `/download`, to ensure that a
-new run was not started in the meantime.
+より洗練されたスクリプトでは、`/start`の呼び出しによって返された`id`値をさらに保存し、それを`/download`のパレンマとして渡すことで、その間に新しいランが開始されないようにします。
 
+## `MALLOC_CONF`インターフェースの使用
+jemallocアロケータは、メモリプロファイリングの動作を制御するためのネイティブインターフェースを提供します。このインターフェイスを通して設定を提供する通常の方法は、環境変数 `MALLOC_CONF` を設定することです。
 
-## Using the `MALLOC_CONF` Interface
+**注意:** メモリプロファイリングが `MALLOC_CONF` を通して開始されたことを libprocess が検出した場合、干渉を避けるためにそれ自身のプロファイリング実行の開始を拒否します。
 
-The jemalloc allocator provides a native interface to control the memory
-profiling behaviour. The usual way to provide settings through this interface is
-by setting the environment variable `MALLOC_CONF`.
+`MALLOC_CONF` インターフェースは、一定量のメモリが割り当てられた後、またはメモリ使用量が新たな高水位に達した時に自動的にヒーププロファイルを生成するような、libprocess が公開していない多くのオプションを提供します。設定の全リストは [jemalloc man page](http://jemalloc.net/jemalloc.3.html)に記載されています。
 
-**NOTE:** If libprocess detects that memory profiling was started through
-`MALLOC_CONF`, it will reject starting a profiling run of its own to avoid
-interference.
+一方で、実行時にプロファイリングを開始/停止したり、`/statistics`エンドポイントで提供される情報を取得したりする機能は、`MALLOC_CONF`インターフェースでは実現できません。
 
-The `MALLOC_CONF` interface provides a number of options that are not exposed by
-libprocess, like generating heap profiles automatically after a certain amount
-of memory has been allocated, or whenever memory usage reaches a new high-water
-mark. The full list of settings is described on the
-[jemalloc man page](http://jemalloc.net/jemalloc.3.html).
-
-On the other hand, features like starting and stopping the profiling at runtime
-or getting the information provided by the `/statistics` endpoint can not be
-achieved through the `MALLOC_CONF` interface.
-
-For example, to create a dump automatically for every 1 GiB worth of recorded
-allocations, one might use the configuration:
+例えば、記録された1GiB分の割り当てごとに自動的にダンプを作成するには、次のような設定を使用します。:
 
     MALLOC_CONF="prof:true,prof_prefix:/path/to/folder,lg_prof_interval=20"
 
-To debug memory allocations during early startup, profiling can be activated
-before accessing the `/start` endpoint:
+初期起動時のメモリ割り当てをデバッグするために、`/start`エンドポイントにアクセスする前にプロファイリングを有効にすることができます。:
 
     MALLOC_CONF="prof:true,prof_active:true"

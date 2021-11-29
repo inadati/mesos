@@ -3,15 +3,15 @@ title: Apache Mesos - Attributes and Resources
 layout: documentation
 ---
 
-# Mesos Attributes & Resources
+# Mesosの属性とリソース
 
-Mesos has two basic methods to describe the agents that comprise a cluster. One of these is managed by the Mesos master, the other is simply passed onwards to the frameworks using the cluster.
+Mesosには、クラスタを構成するエージェントを記述する2つの基本的な方法があります。1つはMesosマスターが管理するもので、もう1つはクラスタを使用するフレームワークに単純に渡されるものです。
 
 ## Types
 
-The types of values that are supported by Attributes and Resources in Mesos are scalar, ranges, sets and text.
+MesosのAttributesとResourceでサポートされている値の種類は、スカラー、レンジ、セット、テキストです。
 
-The following are the definitions of these types:
+これらの型の定義を以下に示します。:
 
     scalar : floatValue
 
@@ -29,23 +29,20 @@ The following are the definitions of these types:
 
 ## Attributes
 
-Attributes are key-value pairs (where value is optional) that Mesos passes along when it sends offers to frameworks. An attribute value supports three different *types*: scalar, range or text.
+属性は、Mesosがフレームワークにオファーを送信する際に渡すキーと値のペア（値はオプション）です。属性の値には、スカラー、レンジ、テキストの3つのタイプがあります。
 
     attributes : attribute ( ";" attribute )*
 
     attribute : text ":" ( scalar | range | text )
 
-Note that setting multiple attributes corresponding to the same key is highly
-discouraged (and might be disallowed in future), as this complicates attribute-
-based filtering of offers, both on schedulers side and on the Mesos side.
+同じキーに対応する複数の属性を設定することは、スケジューラ側とMesos側の両方で、属性に基づくオファーのフィルタリングが複雑になるため、非常にお勧めできません（将来的には禁止される可能性もあります）。
 
 ## Resources
+Mesosでは、スカラー、レンジ、セットの3種類のリソースを管理できます。これらは、Mesosエージェントが提供するさまざまなリソースを表すために使用されます。例えば、スカラーリソースタイプは、エージェントのメモリ量を表すのに使用できます。スカラーリソースは浮動小数点数で表され、小数の値を指定することができます（「1.5CPU」など）。Mesosはスカラリソースの精度として10進数3桁のみをサポートしています（例：「1.5123CPU」を予約することは「1.512CPU」を予約することと同等とみなされます）。GPUの場合、Mesosは整数値のみをサポートします。
 
-Mesos can manage three different *types* of resources: scalars, ranges, and sets.  These are used to represent the different resources that a Mesos agent has to offer.  For example, a scalar resource type could be used to represent the amount of memory on an agent. Scalar resources are represented using floating point numbers to allow fractional values to be specified (e.g., "1.5 CPUs"). Mesos only supports three decimal digits of precision for scalar resources (e.g., reserving "1.5123 CPUs" is considered equivalent to reserving "1.512 CPUs"). For GPUs, Mesos only supports whole number values.
+リソースは、JSON配列またはキーと値のペアをセミコロンで区切った文字列で指定できます。以下の例を見てもJSONのフォーマットに疑問がある場合は、`include/mesos/mesos.proto`の`Resource` protobufメッセージ定義を確認してください。
 
-Resources can be specified either with a JSON array or a semicolon-delimited string of key-value pairs.  If, after examining the examples below, you have questions about the format of the JSON, inspect the `Resource` protobuf message definition in `include/mesos/mesos.proto`.
-
-As JSON:
+JSONとしては:
 
     [
       {
@@ -82,7 +79,7 @@ As JSON:
       ...
     ]
 
-As a list of key-value pairs:
+key-valueのペアの一覧としては:
 
     resources : resource ( ";" resource )*
 
@@ -92,11 +89,11 @@ As a list of key-value pairs:
 
     resourceRole : text | "*"
 
-Note that `resourceRole` must be a valid role name; see the [roles](roles.md) documentation for details.
+なお、`resourceRole`には有効なロール名を指定する必要があります。詳細は、[ロール](roles.md)のドキュメントを参照してください。
 
-## Predefined Uses & Conventions
+## 規定の用途と規約
 
-There are several kinds of resources that have predefined behavior:
+リソースには、あらかじめ定義された動作があるものがいくつかあります。:
 
   - `cpus`
   - `gpus`
@@ -104,21 +101,20 @@ There are several kinds of resources that have predefined behavior:
   - `mem`
   - `ports`
 
-Note that `disk` and `mem` resources are specified in megabytes. The master's user interface will convert resource values into a more human-readable format: for example, the value `15000` will be displayed as `14.65GB`.
+`disk`および`mem`のリソースは、メガバイト単位で指定されることに注意してください。マスターのユーザ・インターフェースは、リソースの値をより人間が読みやすい形式に変換します。例えば、`15000`という値は`14.65GB`と表示されます。
 
-An agent without `cpus` and `mem` resources will not have its resources advertised to any frameworks.
+`cpus` および `mem` リソースを持たないエージェントは、どのフレームワークにもそのリソースがアドバタイズされません。
 
-## Examples
+## 例
+デフォルトでは、`mesos-agent`の起動時に、Mesosはローカルマシンで利用可能なリソースを自動検出しようとします。また、エージェントが利用可能にするリソースを明示的に設定することもできます。
 
-By default, Mesos will try to autodetect the resources available at the local machine when `mesos-agent` starts up. Alternatively, you can explicitly configure which resources an agent should make available.
-
-Here are some examples of how to configure the resources at a Mesos agent:
+以下は、Mesosエージェントでリソースを設定する方法の例です。:
 
     --resources='cpus:24;gpus:2;mem:24576;disk:409600;ports:[21000-24000,30000-34000];bugs(debug_role):{a,b,c}'
 
     --resources='[{"name":"cpus","type":"SCALAR","scalar":{"value":24}},{"name":"gpus","type":"SCALAR","scalar":{"value":2}},{"name":"mem","type":"SCALAR","scalar":{"value":24576}},{"name":"disk","type":"SCALAR","scalar":{"value":409600}},{"name":"ports","type":"RANGES","ranges":{"range":[{"begin":21000,"end":24000},{"begin":30000,"end":34000}]}},{"name":"bugs","type":"SET","set":{"item":["a","b","c"]},"role":"debug_role"}]'
 
-Or given a file `resources.txt` containing the following:
+また、次のような内容のファイル`resources.txt`が与えられます。:
 
     [
       {
@@ -179,29 +175,29 @@ Or given a file `resources.txt` containing the following:
       }
     ]
 
-You can do:
+以下のようなことが可能です:
 
     $ path/to/mesos-agent --resources=file:///path/to/resources.txt ...
 
-In this case, we have five resources of three different types: scalars, a range, and a set.  There are scalars called `cpus`, `gpus`, `mem` and `disk`, a range called `ports`, and a set called `bugs`. `bugs` is assigned to the role `debug_role`, while the other resources do not specify a role and are thus assigned to the default role.
+今回のケースでは、スカラー、範囲、セットの3種類のリソースが5つあります。`cpus`，`gpus`，`mem`，`disk`というスカラー，`ports`という範囲，`bugs`というセットです。`bugs`には`debug_role`というロールが割り当てられていますが，他のリソースにはロールが指定されていないため，デフォルトロールが割り当てられています。
 
-Note: the "default role" can be set by the `--default_role` flag.
+**注意:**「デフォルトロール」は `--default_role` フラグで設定できます。
 
-  - scalar called `cpus`, with the value `24`
-  - scalar called `gpus`, with the value `2`
-  - scalar called `mem`, with the value `24576`
-  - scalar called `disk`, with the value `409600`
-  - range called `ports`, with values `21000` through `24000` and `30000` through `34000` (inclusive)
-  - set called `bugs`, with the values `a`, `b` and `c`, assigned to the role `debug_role`
+* `cpus`というスカラー、値は`24`
+* `gpus`というスカラ、値は`2`
+* `mem` という名のスカラ、値は `24576`
+* `disk`という名のスカラ、値は`409600`
+* `ports` という範囲には、`21000` から `24000`、`30000` から `34000`（いずれも含む）の値が入ります。
+* `bugs`と呼ばれるセット、値は`a`、`b`、`c`で、役割は`debug_role`に割り当てられています。
 
-To configure the attributes of a Mesos agent, you can use the `--attributes` command-line flag of `mesos-agent`:
+Mesosエージェントの属性を設定するには、`mesos-agent`の`--attributes`コマンドラインフラグを使用できます。:
 
     --attributes='rack:abc;zone:west;os:centos5;level:10;keys:[1000-1500]'
 
-That will result in configuring the following five attributes:
+その結果、以下の5つの属性が設定されることになります。:
 
-  - `rack` with text value `abc`
-  - `zone` with text value `west`
-  - `os` with text value `centos5`
-  - `level` with scalar value 10
-  - `keys` with range value `1000` through `1500` (inclusive)
+* テキスト値がabcの`rack`
+* テキスト値 west を持つ`zone`
+* テキスト値 `centos5` を持つ `os`
+* スカラー値10の`level`
+* 範囲値`1000`～`1500`（含む）の`keys`

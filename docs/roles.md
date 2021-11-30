@@ -4,176 +4,85 @@ layout: documentation
 ---
 
 # Roles
+最近のホストレベルのオペレーティングシステム（Linux、BSDなど）の多くは、複数のユーザーをサポートしています。同様に、Mesosはマルチユーザーのクラスタ管理システムであり、1つのMesosクラスタが組織のリソースを管理し、組織のユーザーにサービスを提供することを想定しています。
 
-Many modern host-level operating systems (e.g. Linux, BSDs, etc) support
-multiple users. Similarly, Mesos is a multi-user cluster management system,
-with the expectation of a single Mesos cluster managing an organization's
-resources and servicing the organization's users.
+そのため、Mesosはリソース管理に関する多くの要件に対応する必要があります。:
 
-As such, Mesos has to address a number of requirements related to resource
-management:
 
-* Fair sharing of the resources amongst users
-* Providing resource guarantees to users (e.g. quota, priorities, isolation)
-* Providing accurate resource accounting
-    * How many resources are allocated / utilized / etc?
-    * Per-user accounting
+* ユーザー間でのリソースの公平な共有
+* ユーザーへのリソース保証の提供（例：クォータ、プライオリティ、アイソレーション）
+* 正確なリソースアカウンティングの提供
+  * どれだけのリソースが割り当てられているのか、利用されているのか、など。
+  * ユーザーごとのアカウンティング
 
-In Mesos, we refer to these "users" as __roles__. More precisely, a __role__
-within Mesos refers to a resource consumer within the cluster. This resource
-consumer could represent a user within an organization, but it could also
-represent a team, a group, a service, a framework, etc.
+Mesosでは、これらの「ユーザー」をロールと呼びます。より正確には、Mesosにおけるロールとは、クラスタ内のリソース消費者を指します。このリソース消費者は、組織内のユーザーのほか、チーム、グループ、サービス、フレームワークなどを表すこともあります。
 
-Schedulers subscribe to one or more roles in order to receive resources and
-schedule work on behalf of the resource consumer(s) they are servicing.
+スケジューラは、サービスを提供しているリソース消費者に代わってリソースを受け取り、作業をスケジューリングするために、1つまたは複数のロールにサブスクライブします。
 
-Some examples of resource allocation guarantees that Mesos provides:
+Mesosが提供するリソース割り当て保証の例:
 
-* Guaranteeing that a role is allocated a specified amount of resources
-  (via [quota](quota.md)).
-* Ensuring that some (or all) of the resources on a particular agent
-  are allocated to a particular role (via [reservations](reservation.md)).
-* Ensuring that resources are fairly shared between roles
-  (via [DRF](https://www.cs.berkeley.edu/~alig/papers/drf.pdf)).
-* Expressing that some roles should receive a higher relative share of the
-  cluster (via [weights](weights.md)).
+* ロールに指定された量のリソースが割り当てられることを保証する（[クォータ](quota.md)経由）。
+* 特定のエージェント上のリソースの一部（またはすべて）が特定のロールに割り当てられることを保証する（[reservations](reservation.md)経由）。
+* ロール間でリソースが公平に共有されることを保証する（[DRF](https://www.cs.berkeley.edu/~alig/papers/drf.pdf)経由）。
+* いくつかのロールがクラスタのより高い相対的なシェアを受け取るべきであることを表現します（[weights](weights.md)経由）。
 
-## Roles and access control
+## ロールとアクセスコントロール
+フレームワークがサブスクライブできるロールを制御する方法は2つあります。まず、ACL を使用して、どのフレームワークのプリンシパルがどのロールをサブスクライブできるかを指定できます。詳細については、[authorization](authorization.md)のドキュメントを参照してください。
 
-There are two ways to control which roles a framework is allowed to subscribe
-to. First, ACLs can be used to specify which framework principals can subscribe
-to which roles. For more information, see the [authorization](authorization.md)
-documentation.
+次に、起動時にMesosマスターに`--roles`フラグを渡すことで、ロールのホワイトリストを設定することができます。このフラグは、コンマで区切られたロール名のリストを指定します。ホワイトリストが指定されると、ホワイトリストに登場するロールのみが使用できます。ホワイトリストを変更するには、Mesosマスターの再起動が必要です。なお、Mesosの高可用性導入では、すべてのMesosマスターに同じホワイトリストが設定されるように注意する必要があります。
 
-Second, a _role whitelist_ can be configured by passing the `--roles` flag to
-the Mesos master at startup. This flag specifies a comma-separated list of role
-names. If the whitelist is specified, only roles that appear in the whitelist
-can be used. To change the whitelist, the Mesos master must be restarted. Note
-that in a high-availability deployment of Mesos, you should take care to ensure
-that all Mesos masters are configured with the same whitelist.
+これらのバージョンのMesosでは、ホワイトリストに表示されないロールは使用できないため、Mesos 0.26およびそれ以前のバージョンでは、通常、ACLとホワイトリストの両方を構成する必要があります。
 
-In Mesos 0.26 and earlier, you should typically configure _both_ ACLs and the
-whitelist, because in these versions of Mesos, any role that does not appear in
-the whitelist cannot be used.
+Mesos 0.27では、この動作が変更されました。`--roles`が指定されていない場合、ホワイトリストは任意のロール名の使用を許可します。したがって、Mesos 0.27では、使用可能なロールを定義するためにACLのみを使用することが推奨されます。
+コマンドラインフラグ `--roles` は非推奨です。
 
-In Mesos 0.27, this behavior has changed: if `--roles` is not specified, the
-whitelist permits _any role name_ to be used. Hence, in Mesos 0.27, the
-recommended practice is to only use ACLs to define which roles can be used; the
-`--roles` command-line flag is deprecated.
+## フレームワークとロールの関連付け
 
-## Associating frameworks with roles
+フレームワークは、マスターでサブスクライブする際に、どのロールをサブスクライブしたいかを指定します。これは、`FrameworkInfo`の`roles`フィールドで行います。フレームワークは、更新された`FrameworkInfo`を使って再登録することで、サブスクライブするロールを変更することもできます。
 
-A framework specifies which roles it would like to subscribe to when it
-subscribes with the master. This is done via the `roles` field in
-`FrameworkInfo`. A framework can also change which roles it is
-subscribed to by reregistering with an updated `FrameworkInfo`.
+ユーザーとしては、通常、フレームワークの起動時にフレームワークがサブスクライブするロールを指定できます。これを行う方法は、使用しているフレームワークのユーザー・インターフェースに依存します。例えば、シングルユーザースケジューラは`--mesos_role`コマンドラインフラグを取り、マルチユーザースケジューラは`--mesos-roles`コマンドラインフラグを取るか、組織のLDAPシステムと同期して、組織の構造が変わったときにどのロールを購読するかを自動的に調整することができます。
 
-As a user, you can typically specify which role(s) a framework will
-subscribe to when you start the framework. How to do this depends on the
-user interface of the framework you're using. For example, a single user
-scheduler might take a `--mesos_role` command-line flag and a multi-user
-scheduler might take a `--mesos-roles` command-line flag or sync with
-the organization's LDAP system to automatically adjust which roles it is
-subscribed to as the organization's structure changes.
+### 複数のロールにサブスクライブする
+前述のとおり、フレームワークは複数のロールを同時にサブスクライブできます。これを希望するフレームワークは、`MULTI_ROLE`ケイパビリティにオプトインしなければなりません。
 
-### Subscribing to multiple roles
-
-As noted above, a framework can subscribe to multiple roles
-simultaneously. Frameworks that want to do this must opt-in to the
-`MULTI_ROLE` capability.
-
-When a framework is offered resources, those resources are associated
-with exactly _one_ of the roles it has subscribed to; the framework can
-determine which role an offer is for by consulting the
-`allocation_info.role` field in the `Offer` or the
-`allocation_info.role` field in each offered `Resource` (in the current
-implementation, all the resources in a single `Offer` will be allocated
-to the same role).
+フレームワークがリソースを提供されると、それらのリソースは、フレームワークがサブスクライブしたロールのうちの正確に1つに関連付けられます。フレームワークは、オファーの`allocation_info.role`フィールド、または`Offer`された各Resourceの`allocation_info.role`フィールドを参照することで、オファーがどのロールのためのものであるかを判断することができます（現在の実装では、1つの`Offer`内のすべてのリソースは、同じロールに割り当てられます）。
 
 <a id="roles-multiple-frameworks"></a>
-### Multiple frameworks in the same role
 
-Multiple frameworks can be subscribed to the same role. This can be useful:
-for example, one framework can create a persistent volume and write data to
-it. Once the task that writes data to the persistent volume has finished,
-the volume will be offered to other frameworks subscribed to the same role;
-this might give a second ("consumer") framework the opportunity to launch a
-task that reads the data produced by the first ("producer") framework.
+### 同じ役割で複数のフレームワークを使用
 
-However, configuring multiple frameworks to use the same role should be done
-with caution, because all the frameworks will have access to any resources that
-have been reserved for that role. For example, if a framework stores sensitive
-information on a persistent volume, that volume might be offered to a different
-framework subscribed to the same role. Similarly, if one framework creates a
-persistent volume, another framework subscribed to the same role might "steal"
-the volume and use it to launch a task of its own. In general, multiple
-frameworks sharing the same role should be prepared to collaborate with one
-another to ensure that role-specific resources are used appropriately.
+複数のフレームワークを同じロールにサブスクライブすることができます。例えば、あるフレームワークがパーシステント・ボリュームを作成し、そこにデータを書き込むことができます。例えば、あるフレームワークがパーシステント・ボリュームを作成し、そこにデータを書き込むことができます。パーシステント・ボリュームにデータを書き込むタスクが終了すると、そのボリュームは同じロールにサブスクライブしている他のフレームワークに提供されます。
 
-## Associating resources with roles
+ただし、複数のフレームワークが同じ役割を使用するように設定することには注意が必要です。なぜなら、すべてのフレームワークがその役割のために予約されたリソースにアクセスできるからです。例えば、あるフレームワークが機密情報をパーシステント・ボリュームに保存している場合、そのボリュームが同じ役割に加入している別のフレームワークに提供される可能性があります。同様に、あるフレームワークがパーシステント・ボリュームを作成した場合、同じ役割にサブスクライブしている別のフレームワークがそのボリュームを「盗む」ことで、自分のタスクを起動するために使用する可能性があります。一般に、同じ役割を共有する複数のフレームワークは、役割固有のリソースが適切に使用されるように、互いに協力する準備をしておく必要があります。
 
-A resource is assigned to a role using a _reservation_. Resources can either be
-reserved _statically_ (when the agent that hosts the resource is started) or
-_dynamically_: frameworks and operators can specify that a certain resource
-should subsequently be reserved for use by a given role. For more information,
-see the [reservation](reservation.md) documentation.
+## リソースとロールの関連付け
+リソースは、予約によってロールに割り当てられます。リソースは、静的に（リソースをホストするエージェントの起動時に）予約することも、動的に予約することもできます。フレームワークやオペレータは、特定のロールが使用するために、特定のリソースを後から予約するように指定できます。詳細については、[reservation](reservation.md)のドキュメントを参照してください。
 
 ## Default role
+`*`という名前の役割は特別なものです。予約されていないリソースは、現在のところ、特別な`*`ロールを持っていると表現されます(`*`はどんなロールにもマッチするという考え方です)。デフォルトでは、エージェント・ノードのすべてのリソースは予約されていません (これは、エージェントの起動時に `--default_role` コマンドライン・フラグで変更できます)。
 
-The role named `*` is special. Unreserved resources are currently represented
-as having the special `*` role (the idea being that `*` matches any role). By
-default, all the resources at an agent node are unreserved (this can be changed
-via the `--default_role` command-line flag when starting the agent).
+また、フレームワークが`FrameworkInfo.role`を提供せずに登録した場合、`*`ロールに割り当てられます。Mesos 1.3では、フレームワークは`FrameworkInfo.roles`フィールドを使用する必要があります。このフィールドにはデフォルトの`*`は割り当てられていませんが、フレームワークは必要に応じて`*`を明示的に指定することができます。フレームワークとオペレータは、`*`ロールに予約を入れることはできません。
 
-In addition, when a framework registers without providing a
-`FrameworkInfo.role`, it is assigned to the `*` role. In Mesos 1.3, frameworks
-should use the `FrameworkInfo.roles` field, which does not assign a default of
-`*`, but frameworks can still specify `*` explicitly if desired. Frameworks
-and operators cannot make reservations to the `*` role.
+## 無効なロール名
 
-## Invalid role names
+ロール名は有効なディレクトリ名である必要があるため、以下はできません。:
 
-A role name must be a valid directory name, so it cannot:
+* 空の文字列であること
+* `.`または`..`である。
+* `-`で始まる。
+* スラッシュ、バックスペース、ホワイトスペースのいずれかを含む。
 
-* Be an empty string
-* Be `.` or `..`
-* Start with `-`
-* Contain any slash, backspace, or whitespace character
+## ロールとリソース割り当て
+デフォルトでは、Mesosマスターは加重ドミナント・リソース・フェアネス（wDRF）を使用してリソースを割り当てます。具体的には、このwDRFの実装では、まず、どのロールがそのロールの支配的なリソースの公正なシェアを最も下回っているかを特定します。そして、その役割に加入しているフレームワークに、順番に追加のリソースを提供します。
 
-## Roles and resource allocation
+デフォルトでは、すべてのロールのウェイトは1です。[ウェイト](weights.md)の設定には、[/weights](endpoints/master/weights.md)オペレータエンドポイントを使用するか、またはMesosマスタの起動時に廃止された`--weights`コマンドラインフラグを使用します。
 
-By default, the Mesos master uses weighted Dominant Resource Fairness (wDRF) to
-allocate resources. In particular, this implementation of wDRF first identifies
-which _role_ is furthest below its fair share of the role's dominant resource.
-Each of the frameworks subscribed to that role are then offered additional
-resources in turn.
+## ロールとクオータ
+あるロールに特定の量のリソースが割り当てられることを保証するために、[/quota](endpoints/master/quota.md)エンドポイントでクォータを指定できます。
 
-The resource allocation process can be customized by assigning
-_[weights](weights.md)_ to roles: a role with a weight of 2 will be allocated
-twice the fair share of a role with a weight of 1. By default, every role has a
-weight of 1. Weights can be configured using the
-[/weights](endpoints/master/weights.md) operator endpoint, or else using the
-deprecated `--weights` command-line flag when starting the Mesos master.
+リソースアローケータは、残りのリソースを公平に分配する前に、まずクォータの要件を満たすように試みます。詳細については、[quota](quota.md)のドキュメントを参照してください。
 
-## Roles and quota
+## ロールとプリンシパル
+プリンシパルは、Mesosと対話するエンティティを識別するもので、ユーザー名に似ています。例えば、フレームワークはMesosマスターに登録する際にプリンシパルを提供し、オペレータはオペレータHTTPエンドポイントを使用する際にプリンシパルを提供します。エンティティは、そのアイデンティティを証明するためにプリンシパルによる[認証](authentication.md)を要求されることがあり、プリンシパルは、[リソースの予約](reservation.md)や[パーシステントボリューム](persistent-volume.md)の作成/破棄など、エンティティが実行するアクションを[認可](authorization.md)するために使用されることがあります。
 
-In order to guarantee that a role is allocated a specific amount of resources,
-quota can be specified via the [/quota](endpoints/master/quota.md) endpoint.
-
-The resource allocator will first attempt to satisfy the quota requirements,
-before fairly sharing the remaining resources. For more information, see the
-[quota](quota.md) documentation.
-
-## Role vs. Principal
-
-A principal identifies an entity that interacts with Mesos; principals are
-similar to user names. For example, frameworks supply a principal when they
-register with the Mesos master, and operators provide a principal when using the
-operator HTTP endpoints. An entity may be required to
-[authenticate](authentication.md) with its principal in order to prove its
-identity, and the principal may be used to [authorize](authorization.md) actions
-performed by an entity, such as [resource reservation](reservation.md) and
-[persistent volume](persistent-volume.md) creation/destruction.
-
-Roles, on the other hand, are used exclusively for resource allocation, as
-covered above.
+一方、ロールは、前述のように、リソースの割り当てにのみ使用されます。

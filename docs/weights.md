@@ -3,45 +3,29 @@ title: Apache Mesos - Weights
 layout: documentation
 ---
 
-# Weights
+# ウェイト
+Mesosでは、ウェイトを使用して、異なる[ロール](roles.md)に提供されるクラスタリソースの相対的なシェアを制御することができます。
 
-In Mesos, __weights__ can be used to control the relative share of cluster
-resources that is offered to different [roles](roles.md).
+Mesos 0.28およびそれ以前のバージョンでは、ウェイトはMesosマスターの起動時に`--weights`コマンドラインフラグを指定することでのみ設定できます。ロールに`--weights`フラグで指定されたウェイトがない場合は、デフォルト値（1.0）が使用されます。フラグを更新してすべてのMesosマスターを再起動しない限り、ウェイトを変更することはできません。
 
-In Mesos 0.28 and earlier, weights can only be configured by specifying
-the `--weights` command-line flag when starting the Mesos master. If a
-role does not have a weight specified in the `--weights` flag, then the default
-value (1.0) will be used. Weights cannot be changed without updating the flag
-and restarting all Mesos masters.
+Mesos 1.0 には [/weights](endpoints/master/weights.md) オペレータエンドポイントが含まれており、実行時にウェイトを変更することができます。`--weights` コマンドラインフラグは非推奨です。
 
-Mesos 1.0 contains a [/weights](endpoints/master/weights.md) operator endpoint
-that allows weights to be changed at runtime. The `--weights` command-line flag
-is deprecated.
+# オペレーター HTTPエンドポイント
+master `/weights` HTTPエンドポイントは、オペレーターがウェイトの設定を行えるようにします。このエンドポイントは現在、RESTライクなインターフェースを提供しており、以下の操作をサポートしています。:
+* PUTによるウェイトの[Update](#putRequest)。
+* GETで現在設定されているウェイトの[Query](#getRequest)。
 
-# Operator HTTP Endpoint
-
-The master `/weights` HTTP endpoint enables operators to configure weights. The
-endpoint currently offers a REST-like interface and supports the following operations:
-
-* [Updating](#putRequest) weights with PUT.
-* [Querying](#getRequest) the currently set weights with GET.
-
-The endpoint can optionally use authentication and authorization. See the
-[authentication guide](authentication.md) for details.
+エンドポイントは、オプションで認証と認可を使用できます。詳しくは、[認証ガイド](authentication.md)をご覧ください。
 
 <a name="putRequest"></a>
 ## Update
+オペレーターがウェイトを更新するには、`/weights`エンドポイントにHTTP PUTリクエストを送信します。
 
-The operator can update the weights by sending an HTTP PUT request to the `/weights`
-endpoint.
-
-An example request to the `/weights` endpoint could look like this (using the
-JSON file below):
+`/weights`エンドポイントへのリクエストの例は、以下のようになります（以下のJSONファイルを使用）。:
 
     $ curl -d @weights.json -X PUT http://<master-ip>:<port>/weights
 
-For example, to set a weight of `2.0` for `role1` and set a weight of `3.5`
-for `role2`, the operator can use the following `weights.json`:
+例えば、`role1`に`2.0`のウェイトを設定し、`role2`に`3.5`のウェイトを設定する場合、オペレータは以下の`weights.json`を使用できます。:
 
         [
           {
@@ -54,31 +38,24 @@ for `role2`, the operator can use the following `weights.json`:
           }
         ]
 
-If the master is configured with an explicit [role whitelist](roles.md), the
-request is only valid if all specified roles exist in the role whitelist.
+マスターに明示的なロールホワイトリストが設定されている場合、指定されたすべてのロールが[ロールホワイトリスト](roles.md)に存在する場合にのみ要求が有効になります。
 
-Weights are now persisted in the registry on cluster bootstrap and after any
-updates.  Once the weights are persisted in the registry, any Mesos master that
-subsequently starts with `--weights` still specified will emit a warning and use
-the registry value instead.
+クラスタの起動時および更新後に、ウェイトがレジストリに永続化されるようになりました。ウェイトがレジストリに永続化されると、その後`--weights`が指定されたまま起動したMesosマスターは警告を発し、代わりにレジストリ値を使用します。
 
-The operator will receive one of the following HTTP response codes:
-
-* `200 OK`: Success (the update request was successful).
-* `400 BadRequest`: Invalid arguments (e.g., invalid JSON, non-positive weights).
-* `401 Unauthorized`: Unauthenticated request.
-* `403 Forbidden`: Unauthorized request.
+オペレータには、次のいずれかのHTTP応答コードが表示されます。:
+* `200 OK: Success`:（アップデート要求が成功した）。
+* `400 BadRequest`: 無効な引数（無効なJSON、正のウェイトでないなど）。
+* `401 Unauthorized`: 認証されていません。認証されていないリクエストです。
+* `403 Forbidden`: 認証されていないリクエストです。
 
 <a name="getRequest"></a>
 ## Query
 
-The operator can query the configured weights by sending an HTTP GET request
-to the `/weights` endpoint.
+オペレーターは、`/weights`エンドポイントにHTTP GETリクエストを送信することで、設定されたウェイトを問い合わせることができます。
 
     $ curl -X GET http://<master-ip>:<port>/weights
 
-The response message body includes a JSON representation of the current
-configured weights, for example:
+応答メッセージボディには、例えば、現在設定されているウェイトのJSON表現が含まれています。:
 
         [
           {
@@ -91,7 +68,7 @@ configured weights, for example:
           }
         ]
 
-The operator will receive one of the following HTTP response codes:
+オペレーターは以下のいずれかのHTTPレスポンスコードを受け取ります。:
 
-* `200 OK`: Success.
-* `401 Unauthorized`: Unauthenticated request.
+* `200 OK`: 成功です。
+* `401 Unauthorized`: 認証されていないリクエストです。

@@ -3,44 +3,36 @@ title: Apache Mesos - Quota
 layout: documentation
 ---
 
-# Quota
+# クォータ
 
-When multiple users are sharing a cluster, the operator may want to set limits
-on how many resources each user can use. Quota addresses this need and allows
-operators to set these limits on a per-role basis.
+複数のユーザがクラスタを共有している場合、オペレータは各ユーザが使用できるリソースの数に制限を設けたい場合があります。Quotaはこのようなニーズに対応し、オペレータはロールごとに制限を設定することができます。
 
-* [Supported Resources](#supported-resources)
-* [Setting Quotas](#updating-quotas)
-* [Viewing Quotas](#viewing-quotas)
-* [Deprecated: Quota Guarantees](#deprecated-quota-guarantees)
-* [Implementation Notes](#implementation-notes)
+* [サポートされているリソース](#supported-resources)
+* [クオータの更新](#updating-quotas)
+* [クオータの表示](#viewing-quotas)
+* [非推奨: クォータの保証](#deprecated-quota-guarantees)
+* [実装上の注意](#implementation-notes)
 
+## サポートされているリソース
 
-## Supported Resources
-
-The following resources have quota support:
+以下のリソースはクォータをサポートしています。
 
 * `cpus`
 * `mem`
 * `disk`
 * `gpus`
-* any custom resource of type `SCALAR`
+* `SCALAR`タイプの任意のカスタムリソース
 
-The following resources do not have quota support:
+以下のリソースはクォータをサポートしていません。:
 
 * `ports`
-* any custom resource of type `RANGES` or `SET`
+* `RANGES` または `SET`タイプの任意のカスタムリソース
 
 
-## Updating Quotas
+## クオータの更新
+デフォルトでは、すべてのロールにリソース制限はありません。1つまたは複数のロールのリソース制限を変更するには、v1 API `UPDATE_QUOTA`コールを使用します。このコールは、すべてか無かの方法で更新を適用することに注意してください。したがって、ロールのクォータ更新の1つが無効または未承認の場合は、要求全体が通過しません。
 
-By default, every role has no resource limits. To modify the resource limits
-for one or more roles, the v1 API `UPDATE_QUOTA` call is used. Note that this
-call applies the update in an all-or-nothing manner, so that if one of the
-role's quota updates is invalid or unauthorized, the entire request will not
-go through.
-
-Example:
+例:
 
 ```
 curl --request POST \
@@ -71,25 +63,19 @@ curl --request POST \
                }
              }'
 ```
-
-* Note that the request will be denied if the current quota consumption is above
-the provided limit. This check can be overriden by setting `force` to `true`.
-* Note that the master will attempt to rescind a sufficient number of offers to
-ensure that the role cannot exceed its limits.
+* 現在のクォータ消費量が提供された制限値を超えている場合、リクエストは拒否されることに注意してください。このチェックは、`force`を`true`に設定することにより、上書きすることができます。
+* マスターは、ロールがその制限を超えられないように、十分な数のオファーを取り消すことを試みますので注意してください。
 
 
-## Viewing Quotas
+## クオータの表示
 
 ### Web UI
-
-The 'Roles' tab in the web ui displays resource accounting information for all
-known roles. This includes the configured quota and the quota consumption.
+Web UIの「Roles」タブには、すべての既知のロールのリソースアカウンティング情報が表示されます。これには、設定されたクォータとクォータの消費量が含まれます。
 
 ### API
+クォータ関連の情報を見るためのエンドポイントがいくつかあります。
 
-There are several endpoints for viewing quota related information.
-
-The v1 API `GET_QUOTA` call will return the quota configuration:
+v1 APIの`GET_QUOTA`コールは、クォータの設定を返します。:
 
 ```
 $ curl --request POST \
@@ -99,7 +85,7 @@ $ curl --request POST \
      --data '{ "type": "GET_QUOTA" }'
 ```
 
-Response:
+レスポンス:
 
 ```
 {
@@ -132,14 +118,13 @@ Response:
   }
 }
 ```
-
-To also view the quota consumption, use the `/roles` endpoint:
+クオータの消費量を表示するには、`/roles`エンドポイントを使用します。:
 
 ```
 $ curl http://<master-ip>:<master-port>/roles
 ```
 
-Response
+レスポンス
 
 ```
 {
@@ -178,54 +163,29 @@ Response
 }
 ```
 
-### Quota Consumption
+### クォータ消費
 
-A role's quota consumption consists of its allocations and reservations.
-In other words, even if reservations are not allocated, they are included
-in the quota consumption. Offered resources are not charged against quota.
+ロールのクォータ消費量は、割り当てと予約で構成されています。言い換えれば、予約が割り当てられていなくても、クォータ消費量に含まれます。提供されたリソースはクォータに対して課金されません。
 
+### メトリクス
 
-### Metrics
-
-The following metric keys are exposed for quota:
+quotaでは、以下のメトリクスキーが公開されます。:
 
 * `allocator/mesos/quota/roles/<role>/resources/<resource>/guarantee`
 * `allocator/mesos/quota/roles/<role>/resources/<resource>/limit`
-* A quota consumption metric will be added via
-  [MESOS-9123](https://issues.apache.org/jira/browse/MESOS-9123).
+* クオータ消費量の指標は、次の方法で追加されます。[MESOS-9123](https://issues.apache.org/jira/browse/MESOS-9123)
 
 
-## Deprecated: Quota Guarantees
+## 非推奨: クォータの保証
+Mesos 1.9より前のクォータ関連APIでは、クォータの「保証」のみが公開されており、ロールが利用できるリソースの最低量を保証していました。保証を設定すると、暗黙のクォータ制限も設定されます。Mesos 1.9+では、クォータ制限は上記のドキュメントに従って直接公開されるようになりました。
 
-Prior to Mesos 1.9, the quota related APIs only exposed quota "guarantees"
-which ensured a minimum amount of resources would be available to a role.
-Setting guarantees also set implicit quota limits. In Mesos 1.9+, quota
-limits are now exposed directly per the above documentation.
+クォータ保証は非推奨となり、クォータ制限のみを使用するようになりました。クォータ保証を実施するには、未充足のクォータ保証をすべて満たすために、Mesosが十分なリソースを保持する必要がありました。Mesosは楽観的オファーモデルに移行しているため（マルチロール／マルチスケジューラのスケーラビリティを向上させるため、[MESOS-1607](https://issues.apache.org/jira/browse/MESOS-1607)を参照）、リソースを保留してクォータ保証を実施することはできなくなります。このようなモデルでは、クォータ制限は簡単に実施できますが、クォータ保証では、未充足の保証のためのスペースを確保するために、複雑な「有効な制限」の伝搬モデルが必要になります。
 
-Quota guarantees are now deprecated in favor of using only quota limits.
-Enforcement of quota guarantees required that Mesos holds back enough
-resources to meet all of the unsatisfied quota guarantees. Since Mesos is
-moving towards an optimistic offer model (to improve multi-role / multi-
-scheduler scalability, see
-[MESOS-1607](https://issues.apache.org/jira/browse/MESOS-1607)), it will
-become no longer possible to enforce quota guarantees by holding back
-resources. In such a model, quota limits are simple to enforce, but quota
-guarantees would require a complex "effective limit" propagation model to
-leave space for unsatisfied guarantees.
+これらの理由から、クォータ保証はMesos 1.9ではまだ機能していますが、現在は非推奨となっています。楽観的オファーモデルでは、制限と優先度ベースの先取りの組み合わせがよりシンプルになります。
 
-For these reasons, quota guarantees, while still functional in Mesos 1.9,
-are now deprecated. A combination of limits and priority based preemption
-will be simpler in an optimistic offer model.
+クォータ保証に関するドキュメントは、以前のドキュメントを参照してください： [https://github.com/apache/mesos/blob/1.8.0/docs/quota.md](https://github.com/apache/mesos/blob/1.8.0/docs/quota.md)
 
-For documentation on quota guarantees, please see the previous
-documentation: [https://github.com/apache/mesos/blob/1.8.0/docs/quota.md](https://github.com/apache/mesos/blob/1.8.0/docs/quota.md)
-
-
-## Implementation Notes
-
-* Quota is not supported on nested roles (e.g. `eng/prod`).
-* During failover, in order to correctly enforce limits, the allocator
-  will be paused and will not issue offers until at least 80% agents
-  re-register or 10 minutes elapses. These parameters will be made
-  configurable: [MESOS-4073](https://issues.apache.org/jira/browse/MESOS-4073)
-* Quota is SUPPORTED for the default `*` role now [MESOS-3938](https://issues.apache.org/jira/browse/MESOS-3938).
+## 実装上の注意点
+* クオータはネストしたロール（例：`eng/prod`）ではサポートされていません。
+* フェイルオーバー時には、制限を正しく適用するために、アロケータは一時停止し、少なくとも80％のエージェントが再登録するか、10分が経過するまでオファーを発行しません。これらのパラメータは設定可能になる予定です。[MESOS-4073](https://issues.apache.org/jira/browse/MESOS-4073)
+* クオータは現在、デフォルトのロールでサポートされています。[MESOS-3938](https://issues.apache.org/jira/browse/MESOS-3938)

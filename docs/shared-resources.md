@@ -3,30 +3,17 @@ title: Apache Mesos - Shared Persistent Volumes
 layout: documentation
 ---
 
-# Shared Persistent Volumes
+# 共有パーシステントボリューム
 
-## Overview
+## 概要
+タスクが[パーシステントボリューム](persistent-volume.md)を使用して起動すると、他のタスクはそのボリュームを使用することができず、ボリュームは、それを使用しているタスクが終了するまで、どのリソースオファーにも表示されません。
 
-By default, [persistent volumes](persistent-volume.md) provide
-_exclusive_ access: once a task is launched using a persistent volume,
-no other tasks can use that volume, and the volume will not appear in
-any resource offers until the task that is using it has finished.
+場合によっては、同じエージェント上で実行されている複数のタスク間でボリュームを共有することが有用な場合があります。例えば、複数のデータ分析タスク間で大規模なデータセットを効率的に共有するために使用することができます。
 
-In some cases, it can be useful to share a volume between multiple tasks
-running on the same agent. For example, this could be used to
-efficiently share a large data set between multiple data analysis tasks.
+## 共有ボリュームの作成
+共有パーシステントボリュームは、通常のパーシステントボリュームと同じワークフローを使用して作成されます。[予約されたリソース](reservation.md)から開始し、フレームワークスケジューラAPIまたは[/creat-volumes](endpoints/master/create-volumes.md) HTTPエンドポイントを介して`CREATE`操作を適用します。共有ボリュームを作成するには、ボリューム作成時に `shared` フィールドを設定します。
 
-## Creating Shared Volumes
-
-Shared persistent volumes are created using the same workflow as normal
-persistent volumes: by starting with a
-[reserved resource](reservation.md) and applying a `CREATE` operation,
-either via the framework scheduler API or the
-[/create-volumes](endpoints/master/create-volumes.md) HTTP endpoint. To
-create a shared volume, set the `shared` field during volume creation.
-
-For example, suppose a framework subscribed to the `"engineering"` role
-receives a resource offer containing 2048MB of dynamically reserved disk:
+たとえば、`"engineering"`ロールにサブスクライブしているフレームワークが、2048MBの動的に予約されたディスクを含むリソースオファーを受け取ったとします。
 
 ```
 {
@@ -50,8 +37,7 @@ receives a resource offer containing 2048MB of dynamically reserved disk:
 }
 ```
 
-The framework can create a shared persistent volume using this disk
-resource via the following offer operation:
+フレームワークは、このディスクリソースを使用して、次のようなオファー操作で共有永続性ボリュームを作成できます。:
 
 ```
 {
@@ -83,55 +69,26 @@ resource via the following offer operation:
   }
 }
 ```
+`shared`フィールドが（空のJSONオブジェクトに）設定されていることに注意してください。これは、`CREATE`オペレーションが共有ボリュームを作成することを示しています。
 
-Note that the `shared` field has been set (to an empty JSON object),
-which indicates that the `CREATE` operation will create a shared volume.
+## 共有ボリュームの使用
+共有ボリュームを含むリソースオファーを受け取る資格を得るためには、フレームワークがマスターに登録する際に提供する`FrameworkInfo`で`SHARED_RESOURCES`ケイパビリティを有効にする必要があります。このケイパビリティを有効にしていないフレームワークは、共有リソースを提供されません。
 
-## Using Shared Volumes
+フレームワークがリソースの提供を受けた場合、`shared`フィールドが設定されているかどうかを確認することで、ボリュームが共有されているかどうかを判断できます。通常のパーシステント・ボリュームとは異なり、タスクによって使用されている共有ボリュームは、そのボリュームのロールにサブスクライブされているフレームワークに提供され続けます。フレームワークは、1つの`ACCEPT`コールを使用してボリュームにアクセスする複数のタスクを起動することもできます。
 
-To be eligible to receive resource offers that contain shared volumes, a
-framework must enable the `SHARED_RESOURCES` capability in the
-`FrameworkInfo` it provides when it registers with the master.
-Frameworks that do _not_ enable this capability will not be offered
-shared resources.
+なお、Mesosでは、ボリュームを共有するタスク間の分離や同時実行の制御は行われません。フレームワークの開発者は、同じボリュームにアクセスするタスクが互いに競合しないようにする必要があります。これは、アプリケーションレベルの同時実行制御を慎重に行うか、タスクがボリュームに読み取り専用でアクセスするようにすることで実現できます。[Persistent Volume](persistent-volume.md)のドキュメントに記載されているように、ボリューム上で起動されるタスクは、`"RO"`モードを指定してボリュームを読み取り専用モードで使用できます。
 
-When a framework receives a resource offer, it can determine whether a
-volume is shared by checking if the `shared` field has been set. Unlike
-normal persistent volumes, a shared volume that is in use by a task will
-continue to be offered to the frameworks subscribed to the volume's role;
-this gives those frameworks the opportunity to launch additional tasks
-that can access the volume. A framework can also launch multiple tasks
-that access the volume using a single `ACCEPT` call.
+### 共有ボリュームの破棄
 
-Note that Mesos does not provide any isolation or concurrency control
-between the tasks that are sharing a volume. Framework developers should
-ensure that tasks that access the same volume do not conflict with one
-another. This can be done via careful application-level concurrency
-control, or by ensuring that the tasks access the volume in a read-only
-manner. Mesos provides support for read-only access to volumes: as
-described in the [persistent volume](persistent-volume.md)
-documentation, tasks that are launched on a volume can specify a `mode`
-of `"RO"` to use the volume in read-only mode.
+共有されているかどうかにかかわらず、永続的なボリュームは、そのボリュームを使用して実行中または保留中のタスクが起動していない場合にのみ破壊することができます。非共有ボリュームの場合、ボリュームを削除しても安全なタイミングを判断するのは通常簡単です。共有ボリュームの場合、ボリュームを使用してタスクを起動したフレームワークは、通常、ボリュームを破壊する前に、ボリュームがもはや使用されていないことを（例えば、参照カウントによって）確認するために調整する必要があります。
 
-### Destroying Shared Volumes
+### リソースアロケーション
 
-A persistent volume, whether shared or not, can only be destroyed if no
-running or pending tasks have been launched using the volume. For
-non-shared volumes, it is usually easy to determine when it is safe to
-delete a volume. For shared volumes, the framework(s) that have launched
-tasks using the volume typically need to coordinate to ensure (e.g., via
-reference counting) that a volume is no longer being used before it is
-destroyed.
+TODO：共有ボリュームがリソース配分に与える影響は？
 
-### Resource Allocation
+## 参考資料
 
-TODO: how do shared volumes influence resource allocation?
+* [MESOS-3421](https://issues.apache.org/jira/browse/MESOS-3421)には、この機能の実装に関する追加情報が記載されています。
 
-## References
-
-* [MESOS-3421](https://issues.apache.org/jira/browse/MESOS-3421)
-  contains additional information about the implementation of this
-  feature.
-
-* Talk at MesosCon Europe 2016 on August 31, 2016 entitled
+* 2016年8月31日に開催された「MesosCon Europe 2016」でのトークの題名
   "[Practical Persistent Volumes](http://schd.ws/hosted_files/mesosconeu2016/08/MesosConEurope2016PPVv1.0.pdf)".

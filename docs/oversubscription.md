@@ -3,80 +3,40 @@ title: Apache Mesos - Oversubscription
 layout: documentation
 ---
 
-# Oversubscription
+# オーバーサブスクリプション
 
-High-priority user-facing services are typically provisioned on large clusters
-for peak load and unexpected load spikes. Hence, for most of time, the
-provisioned resources remain underutilized. Oversubscription takes advantage of
-temporarily unused resources to execute best-effort tasks such as background
-analytics, video/image processing, chip simulations, and other low priority
-jobs.
+優先度の高いユーザー向けサービスは、通常、ピーク時の負荷や予期せぬ負荷の急増に備えて大規模なクラスターにプロビジョニングされます。そのため、ほとんどの時間、プロビジョニングされたリソースは十分に活用されていません。オーバーサブスクリプションでは、一時的に使用されていないリソースを利用して、バックグラウンド分析、ビデオ/画像処理、チップシミュレーション、その他の低優先度のジョブなどのベストエフォート型のタスクを実行します。
 
-## How does it work?
+## どのような仕組みになっているのですか？
 
-Oversubscription was introduced in Mesos 0.23.0 and adds two new agent
-components: a Resource Estimator and a Quality of Service (QoS) Controller,
-alongside extending the existing resource allocator, resource monitor, and
-Mesos agent. The new components and their interactions are illustrated below.
+オーバーサブスクリプションはMesos 0.23.0で導入され、既存のリソースアロケータ、リソースモニタ、Mesosエージェントの拡張に加えて、Resource EstimatorとQuality of Service (QoS) Controllerという2つの新しいエージェントコンポーネントが追加されました。新しいコンポーネントとその相互作用を以下に示します。
 
 ![Oversubscription overview](images/oversubscription-overview.jpg)
 
-### Resource estimation
+### リソースの推定
+* (1) 最初のステップは、オーバーサブスクライブされたリソースの量を特定することです。リソース見積もり担当者は、リソースモニターを利用して、`ResourceStatistic`メッセージを介して使用状況の統計情報を定期的に取得します。resource estimatorは、収集したリソースの統計情報に基づいてロジックを適用し、オーバーサブスクライブされたリソースの量を決定する。これは、測定されたリソースの使用スラック（割り当てられたが未使用のリソース）と割り当てスラックに基づいた一連の制御アルゴリズムとすることができます。
 
- - (1) The first step is to identify the amount of oversubscribed resources.
-   The resource estimator taps into the resource monitor and periodically gets
-usage statistics via `ResourceStatistic` messages. The resource estimator
-applies logic based on the collected resource statistics to determine the
-amount of oversubscribed resources. This can be a series of control algorithms
-based on measured resource usage slack (allocated but unused resources) and
-allocation slack.
+* (2) エージェントは、リソース推定装置からの推定値をポーリングし続け、最新の推定値を追跡します。
 
- - (2) The agent keeps polling estimates from the resource estimator and tracks
-   the latest estimate.
+* (3) 最新の推定値が前回の推定値と異なる場合、エージェントはマスターにオーバーサブスクライブされたリソースの合計量を送信します。
 
- - (3) The agent will send the total amount of oversubscribed resources to the
-   master when the latest estimate is different from the previous estimate.
+### リソーストラッキング＆スケジューリングアルゴリズム
 
-### Resource tracking & scheduling algorithm
+* (4) 割り当て担当者は、オーバーサブスクライブされたリソースを通常のリソースとは別に記録し、それらのリソースを`revocable`なものとして注釈をつける。どのような種類のリソースをオーバーサブスクライブできるかは、リソース見積もり担当者に委ねられています。CPU シェアや帯域幅などの圧縮可能なリソースのみをオーバーサブスクライブすることを推奨する。
 
- - (4) The allocator keeps track of the oversubscribed resources separately
-   from regular resources and annotate those resources as `revocable`. It is up
-to the resource estimator to determine which types of resources can be
-oversubscribed. It is recommended only to oversubscribe _compressible_
-resources such as cpu shares, bandwidth, etc.
+### フレームワーク
+* (5)フレームワークは、通常の`launchTasks()`APIを使用して、取り消し可能なリソース上でタスクを起動することを選択できます。先取りに対処するように設計されていないフレームワークを保護するために、フレームワーク情報に`REVOCABLE_RESOURCES`（取り消し可能なリソース）ケイパビリティセットを登録したフレームワークだけが、取り消し可能なリソースのオファーを受け取ります。さらに、取り消し可能なリソースは動的に予約することができず、取り消し可能なディスクリソース上に永続的なボリュームを作成してはいけません。
 
-### Frameworks
+### タスクの起動
 
- - (5) Frameworks can choose to launch tasks on revocable resources by using
-   the regular `launchTasks()` API. To safe-guard frameworks that are not
-designed to deal with preemption, only frameworks registering with the
-`REVOCABLE_RESOURCES` capability set in its framework info will receive offers
-with revocable resources.  Further more, revocable resources cannot be
-dynamically reserved and persistent volumes should not be created on revocable
-disk resources.
+* 取り消し可能なタスクは、エージェントで `runTask` リクエストを受信すると、通常通り起動します。取り消し可能なタスクと通常のタスクで特定のリソースを異なる方法で設定する必要がある場合、リソースは引き続き取り消し可能としてマークされ、アイソレータは適切なアクションを取ることができます。
+> 注: タスクやエクゼキュータが使用するリソースが取り消し可能な場合、コンテナ全体が取り消し可能なコンテナとして扱われるため、QoS コントローラがキルやスロットルを行うことができます。
 
-### Task launch
+### 干渉の検出
+* (6) 取り消し可能なタスクが実行されているときには、そのリソース上で実行されている元のタスクを常に監視し、SLAに基づいてパフォーマンスを保証することが重要である。検出された干渉に対応するために，QoS コントローラは，実行中の取り消し可能なタスクをキルまたはスロットルできる必要があります。
 
- - The revocable task is launched as usual when the `runTask` request is received
-   on the agent. The resources will still be marked as revocable and isolators
-can take appropriate actions, if certain resources need to be setup differently
-for revocable and regular tasks.
-
-> NOTE: If any resource used by a task or executor is
-revocable, the whole container is treated as a revocable container and can
-therefore be killed or throttled by the QoS Controller.
-
-### Interference detection
-
- - (6) When the revocable task is running, it is important to constantly
-   monitor the original task running on those resources and guarantee
-performance based on an SLA.  In order to react to detected interference, the
-QoS controller needs to be able to kill or throttle running revocable tasks.
-
-## Enabling frameworks to use oversubscribed resources
-
-Frameworks planning to use oversubscribed resources need to register with the
-`REVOCABLE_RESOURCES` capability set:
+## オーバーサブスクライブのリソースを使用するフレームワークを可能にする
+オーバーサブスクライブされたリソースの使用を計画しているフレームワークは、`REVOCABLE_RESOURCES`ケイパビリティセットに登録する必要があります。:
 
 ~~~{.cpp}
 FrameworkInfo framework;
@@ -86,18 +46,12 @@ framework.add_capabilities()->set_type(
     FrameworkInfo::Capability::REVOCABLE_RESOURCES);
 ~~~
 
-From that point on, the framework will start to receive revocable resources in
-offers.
+この時点から、フレームワークは revocable のリソースをオファーで受け取るようになります。
 
-> NOTE: That there is no guarantee that the Mesos cluster has oversubscription
-enabled. If not, no revocable resources will be offered. See below for
-instructions how to configure Mesos for oversubscription.
+>注: Mesosクラスタがオーバーサブスクリプションを有効にしていることは保証されません。そうでない場合は、取り消し可能なリソースはオファーされません。オーバーサブスクリプションのためにMesosを設定する方法については、以下を参照してください。
 
-### Launching tasks using revocable resources
-
-Launching tasks using revocable resources is done through the existing
-`launchTasks` API. Revocable resources will have the `revocable` field set. See
-below for an example offer with regular and revocable resources.
+### `revocable`リソースを利用したタスクの起動
+`revocable`リソースを使用したタスクの起動は、既存の`launchTasks` APIで行います。取り消し可能なリソースには、取り消し可能なフィールドが設定されます。以下に、通常のリソースと取り消し可能なリソースを使ったオファーの例を示します。
 
 ~~~{.json}
 {
@@ -134,17 +88,10 @@ below for an example offer with regular and revocable resources.
 }
 ~~~
 
-## Writing a custom resource estimator
+## カスタムリソースエスティメーターの作成
+resource estimatorは、エージェントで使用される総リソースを推定・予測し、オーバーサブスクライブ可能なリソースをマスターに通知します。デフォルトでは、Mesosには`noop`と`fixed`のリソース推定器が付属しています。`noop` estimatorは、エージェントに空の見積もりを提供するだけで失速し、オーバーサブスクリプションを効果的に無効にします。`fixed` estimator は、実際に測定されたスラックを使用せず、固定のリソース量（コマンドラインフラグで定義）でノードをオーバーサブスクライブします。
 
-The resource estimator estimates and predicts the total resources used on the
-agent and informs the master about resources that can be oversubscribed. By
-default, Mesos comes with a `noop` and a `fixed` resource estimator. The `noop`
-estimator only provides an empty estimate to the agent and stalls, effectively
-disabling oversubscription. The `fixed` estimator doesn't use the actual
-measured slack, but oversubscribes the node with fixed resource amount (defined
-via a command line flag).
-
-The interface is defined below:
+インターフェースは以下のように定義されています。:
 
 ~~~{.cpp}
 class ResourceEstimator
@@ -168,9 +115,9 @@ public:
 };
 ~~~
 
-## Writing a custom QoS controller
+## カスタムQoSコントローラの作成
 
-The interface for implementing custom QoS Controllers is defined below:
+カスタムQoSコントローラを実装するためのインターフェースを以下に定義します。
 
 ~~~{.cpp}
 class QoSController
@@ -191,22 +138,11 @@ public:
 };
 ~~~
 
-> NOTE The QoS Controller must not block `corrections()`. Back the QoS
-> Controller with its own libprocess actor instead.
+>注: QoS コントローラは `corrections()` をブロックしてはなりません。代わりに独自の libprocess アクタで QoS コントローラをバックアップします。
 
-The QoS Controller informs the agent that particular corrective actions need to
-be made. Each corrective action contains information about executor or task and
-the type of action to perform.
+QoS コントローラは、特定の修正アクションを実行する必要があることをエージェントに通知します。各修正アクションには、実行者またはタスクに関する情報と、実行するアクションの種類が含まれます。
 
-Mesos comes with a `noop` and a `load` qos controller. The `noop` controller
-does not provide any corrections, thus does not assure any quality of service
-for regular tasks. The `load` controller is ensuring the total system load
-doesn't exceed a configurable thresholds and as a result try to avoid the cpu
-congestion on the node. If the load is above the thresholds controller evicts
-all the revocable executors. These thresholds are configurable via two module
-parameters `load_threshold_5min` and `load_threshold_15min`. They represent
-standard unix load averages in the system. 1 minute system load is ignored,
-since for oversubscription use case it can be a misleading signal.
+Mesosには、`noop`コントローラと`load` qosコントローラが付属しています。`noop`コントローラは、修正を行わないため、通常のタスクのサービス品質を保証しません。`load`コントローラは、システム全体の負荷が設定可能なしきい値を超えないようにし、その結果、ノード上のCPUの混雑を回避しようとします。負荷がしきい値を超えた場合、コントローラはすべてのリボカブル・エクゼキュータを退避させます。これらのしきい値は、2つのモジュールパラメータ `load_threshold_5min` と `load_threshold_15min` によって設定可能です。これらは、システムの標準的なunix負荷平均を表しています。1分間のシステム負荷は無視されます。なぜなら、オーバーサブスクリプションのユースケースでは、これは誤解を招く信号になる可能性があるからです。
 
 ~~~{.proto}
 message QoSCorrection {
@@ -224,9 +160,9 @@ message QoSCorrection {
 }
 ~~~
 
-## Configuring oversubscription
+## オーバーサブスクリプションの設定
 
-Five new flags has been added to the agent:
+エージェントに5つの新しいフラグが追加されました:
 
 <table class="table table-striped">
   <thead>
@@ -235,7 +171,7 @@ Five new flags has been added to the agent:
         Flag
       </th>
       <th>
-        Explanation
+        説明
       </th>
   </thead>
 
@@ -244,10 +180,7 @@ Five new flags has been added to the agent:
       --oversubscribed_resources_interval=VALUE
     </td>
     <td>
-      The agent periodically updates the master with the current estimation
-about the total amount of oversubscribed resources that are allocated and
-available. The interval between updates is controlled by this flag. (default:
-15secs)
+      Tエージェントは、割り当てられていて利用可能なオーバーサブスクライブされたリソースの合計量に関する現在の推定値をマスターに定期的に更新します。更新の間隔は、このフラグによって制御されます。(デフォルト: 15秒)
     </td>
   </tr>
 
@@ -256,7 +189,7 @@ available. The interval between updates is controlled by this flag. (default:
       --qos_controller=VALUE
     </td>
     <td>
-      The name of the QoS Controller to use for oversubscription.
+      オーバーサブスクリプションに使用するQoSコントローラーの名前
     </td>
   </tr>
 
@@ -265,9 +198,7 @@ available. The interval between updates is controlled by this flag. (default:
       --qos_correction_interval_min=VALUE
     </td>
     <td>
-      The agent polls and carries out QoS corrections from the QoS Controller
-based on its observed performance of running tasks. The smallest interval
-between these corrections is controlled by this flag. (default: 0ns)
+      エージェントは、実行中のタスクのパフォーマンスの観察結果に基づいて、QoS コントローラから QoS 補正をポーリングして実行します。これらの補正の最小間隔は、このフラグで制御します。(デフォルト: 0ns)
     </td>
   </tr>
 
@@ -276,13 +207,13 @@ between these corrections is controlled by this flag. (default: 0ns)
       --resource_estimator=VALUE
     </td>
     <td>
-      The name of the resource estimator to use for oversubscription.
+      オーバーサブスクリプションに使用するリソース・エスティメーターの名前です。
     </td>
   </tr>
 
 </table>
 
-The `fixed` resource estimator is enabled as follows:
+`fixed`されたリソースの推定は、以下のように有効になります。
 
 ```
 --resource_estimator="org_apache_mesos_FixedResourceEstimator"
@@ -300,11 +231,9 @@ The `fixed` resource estimator is enabled as follows:
   }
 }'
 ```
+上記の例では、固定量の14cpusがリボカブルリソースとして提供されます。
 
-In the example above, a fixed amount of 14 cpus will be offered as revocable
-resources.
-
-The `load` qos controller is enabled as follows:
+`load` qosコントローラを以下のように有効にします。
 
 ```
 --qos_controller="org_apache_mesos_LoadQoSController"
@@ -330,11 +259,6 @@ The `load` qos controller is enabled as follows:
   }
 }'
 ```
+上記の例では、標準的なunixシステムのロードアベレージが5分間で6を超えた場合、または15分間で4を超えた場合、エージェントはすべての`revocable`エクゼキュータを退避させます。`LoadQoSController`は、効果的に20秒ごとに実行されます。
 
-In the example above, when standard unix system load average for 5 minutes will
-be above 6, or for 15 minutes will be above 4 then agent will evict all the
-`revocable` executors. `LoadQoSController` will be effectively run every 20
-seconds.
-
-To install a custom resource estimator and QoS controller, please refer to the
-[modules documentation](modules.md).
+カスタムのリソース推定器と QoS コントローラをインストールするには、[モジュールのドキュメント](modules.md)を参照してください。

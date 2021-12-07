@@ -3,225 +3,102 @@ title: Apache Mesos - Authentication
 layout: documentation
 ---
 
-# Authentication
+# 認証
 
-Authentication permits only trusted entities to interact with a Mesos cluster. Authentication can be used by Mesos in three ways:
+認証により、信頼できるエンティティのみがMesosクラスターと対話することができます。認証は、Mesosでは3つの方法で使用できます。
 
-1. To require that frameworks be authenticated in order to register with the master.
-2. To require that agents be authenticated in order to register with the master.
-3. To require that operators be authenticated to use many [HTTP endpoints](endpoints/index.md).
+1. フレームワークをマスターに登録する際に、認証を必要とすること。
+2. マスターに登録するために、エージェントの認証を必要とする。
+3. 多くの[HTTPエンドポイント](endpoints/index.md)を使用するために、オペレーターの認証を必要とすること。
 
-Authentication is disabled by default. When authentication is enabled, operators
-can configure Mesos to either use the default authentication module or to use a
-_custom_ authentication module.
+認証はデフォルトでは無効です。認証を有効にすると、オペレータは、デフォルトの認証モジュールを使用するか、カスタムの認証モジュールを使用するようにMesosを設定できます。
 
-The default Mesos authentication module uses the
-[Cyrus SASL](http://asg.web.cmu.edu/sasl/) library.  SASL is a flexible
-framework that allows two endpoints to authenticate with each other using a
-variety of methods. By default, Mesos uses
-[CRAM-MD5](https://en.wikipedia.org/wiki/CRAM-MD5) authentication.
+デフォルトのMesos認証モジュールは、[Cyrus SASL](http://asg.web.cmu.edu/sasl/)ライブラリを使用します。SASLは、2つのエンドポイントがさまざまな方法で相互に認証できるようにする柔軟なフレームワークです。デフォルトでは、Mesosは[CRAM-MD5](https://en.wikipedia.org/wiki/CRAM-MD5)認証を使用します。
 
-## Credentials, Principals, and Secrets
+## クレデンシャル、プリンシパル、およびシークレット
+デフォルトのCRAM-MD5認証方式を使用する場合、Mesosでの認証を希望するエンティティは、プリンシパルとシークレットで構成されるクレデンシャルを提供する必要があります。プリンシパルは、エンティティが使用するIDであり、シークレットは、そのIDを検証するために使用される任意の文字列です。プリンシパルはユーザ名に似ており、シークレットはパスワードに似ている。
 
-When using the default CRAM-MD5 authentication method, an entity that wants to
-authenticate with Mesos must provide a *credential*, which consists of a
-*principal* and a *secret*. The principal is the identity that the entity would
-like to use; the secret is an arbitrary string that is used to verify that
-identity. Principals are similar to user names, while secrets are similar to
-passwords.
+プリンシパルは、主に認証と[認可](authorization.md)に使用されます。プリンシパルは、フレームワークのユーザー（エージェントがエグゼキュータを実行するために使用するオペレーティング・システム・アカウント）やフレームワークの[ロール](roles.md)（フレームワークがどのリソースを使用できるかを決定するために使用される）とは異なることに注意してください。
 
-Principals are used primarily for authentication and
-[authorization](authorization.md); note that a principal is different from a
-framework's *user*, which is the operating system account used by the agent to
-run executors, and the framework's *[roles](roles.md)*, which are used to
-determine which resources a framework can use.
-
-## Configuration
-
-Authentication is configured by specifying command-line flags when starting the
-Mesos master and agent processes. For more information, refer to the
-[configuration](configuration.md) documentation.
+## 設定
+認証の設定は、Mesosマスターおよびエージェントプロセスの起動時にコマンドラインフラグを指定して行います。詳細については、[設定](configuration.md)ドキュメントを参照してください。
 
 ### Master
+* `--[no-]authenticate` - `true` の場合、認証されたフレームワークのみが登録可能となります。`false`（デフォルト）の場合は、認証されていないフレームワークも登録できます。
 
-* `--[no-]authenticate` - If `true`, only authenticated frameworks are allowed
-  to register. If `false` (the default), unauthenticated frameworks are also
-  allowed to register.
+* `--[no-]authenticate_http_readonly` - `true`の場合、認証をサポートする読み取り専用のHTTPエンドポイントへのHTTPリクエストには認証が必要です。`false`（デフォルト）の場合、これらのエンドポイントは、認証なしで使用できます。読み取り専用のエンドポイントとは、クラスタの状態を変更するために使用できないものです。
 
-* `--[no-]authenticate_http_readonly` - If `true`, authentication is required to
-  make HTTP requests to the read-only HTTP endpoints that support
-  authentication. If `false` (the default), these endpoints can be used without
-  authentication. Read-only endpoints are those which cannot be used to modify
-  the state of the cluster.
+* `--[no-]authenticate_http_readwrite` - `true`の場合、認証をサポートする読み書き両用のHTTPエンドポイントへのHTTPリクエストに認証が必要です。`false`（デフォルト）の場合、これらのエンドポイントは認証なしで使用できます。読み書き可能なエンドポイントは、クラスタの状態を変更するために使用できるものです。
 
-* `--[no-]authenticate_http_readwrite` - If `true`, authentication is required
-  to make HTTP requests to the read-write HTTP endpoints that support
-  authentication. If `false` (the default), these endpoints can be used without
-  authentication. Read-write endpoints are those which can be used to modify the
-  state of the cluster.
+* `--[no-]authenticate_agents` - `true`の場合、認証されたエージェントのみが登録できます。`false`(デフォルト)の場合、認証されていないエージェントも登録できます。
 
-* `--[no-]authenticate_agents` - If `true`, only authenticated agents are
-  allowed to register. If `false` (the default), unauthenticated agents are also
-  allowed to register.
+* `--authentication_v0_timeout` - v0フレームワークまたはエージェントに対して認証が完了するまでのタイムアウトです。これは、v0またはv1のHTTP APIには適用されません（デフォルト：`15秒`）。
 
-* `--authentication_v0_timeout` - The timeout within which an authentication is
-  expected to complete against a v0 framework or agent. This does not apply to
-  the v0 or v1 HTTP APIs.(default: `15secs`)
+* `--authenticators` - 使用する認証モジュールを指定します。デフォルトは`crammd5`ですが、`--modules`オプションを使用して追加モジュールを追加できます。
 
-* `--authenticators` - Specifies which authenticator module to use.  The default
-  is `crammd5`, but additional modules can be added using the `--modules`
-  option.
+* `--http_authenticators` - 使用するHTTP認証モジュールを指定します。デフォルトは basic（基本的な HTTP 認証）ですが、 `--modules` オプションを使って追加モジュールを追加することができます。
 
-* `--http_authenticators` - Specifies which HTTP authenticator module to use.
-  The default is `basic` (basic HTTP authentication), but additional modules can
-  be added using the `--modules` option.
-
-* `--credentials` - The path to a text file which contains a list of accepted
-  credentials.  This may be optional depending on the authenticator being used.
+* `--credentials` - 受け入れられる認証情報のリストを含むテキストファイルへのパスです。使用する認証モジュールによってはオプションとなります。
 
 ### Agent
+* `--authenticatee` - マスターの `--authenticators` オプションと同じで、使用するモジュールを指定します。デフォルトでは`crammd5`が使用されます。
 
-* `--authenticatee` - Analog to the master's `--authenticators` option to
-  specify what module to use.  Defaults to `crammd5`.
+* `--credential` - マスターの `--credentials` オプションと同様ですが、1つのクレデンシャルしか許可されません。このクレデンシャルは、マスターに対するエージェントの識別に使用されます。
 
-* `--credential` - Just like the master's `--credentials` option except that
-  only one credential is allowed. This credential is used to identify the agent
-  to the master.
+* `--[no-]authenticate_http_readonly` - `true`の場合、認証をサポートする読み取り専用のHTTPエンドポイントへのHTTPリクエストには認証が必要です。`false`（デフォルト）の場合、これらのエンドポイントは認証なしで使用できます。読み取り専用エンドポイントとは、エージェントの状態を変更するために使用できないエンドポイントのことです。
 
-* `--[no-]authenticate_http_readonly` - If `true`, authentication is required to
-  make HTTP requests to the read-only HTTP endpoints that support
-  authentication. If `false` (the default), these endpoints can be used without
-  authentication. Read-only endpoints are those which cannot be used to modify
-  the state of the agent.
+* `--[no-]authenticate_http_readwrite` - `true`の場合、認証をサポートする読み書き可能なHTTPエンドポイントへのHTTPリクエストには認証が必要です。`false`（デフォルト）の場合、これらのエンドポイントは認証なしで使用できます。読み書き可能なエンドポイントとは、エージェントの状態を変更するために使用できるものです。後方互換性の理由から、V1エクゼキュータAPIはこのフラグの影響を受けないことに注意してください。
 
-* `--[no-]authenticate_http_readwrite` - If `true`, authentication is required
-  to make HTTP requests to the read-write HTTP endpoints that support
-  authentication. If `false` (the default), these endpoints can be used without
-  authentication. Read-write endpoints are those which can be used to modify the
-  state of the agent. Note that for backward compatibility reasons, the V1
-  executor API is not affected by this flag.
+* `--[no-]authenticate_http_executors` - `true`の場合、V1エクゼキュータAPIへのHTTPリクエストには認証が必要です。`false`（デフォルト）の場合、そのAPIは認証なしで使用できます。このフラグが`true`で、カスタムHTTP認証子が指定されていない場合は、デフォルトの`JWT`認証子がロードされ、エクゼキュータ認証を処理します。
 
-* `--[no-]authenticate_http_executors` - If `true`, authentication is required
-  to make HTTP requests to the V1 executor API. If `false` (the default), that
-  API can be used without authentication. If this flag is `true` and custom
-  HTTP authenticators are not specified, then the default `JWT` authenticator is
-  loaded to handle executor authentication.
+* `--http_authenticators` - 使用する HTTP 認証モジュールを指定します。デフォルトは`basic`ですが、`--modules` オプションを使用してモジュールを追加することができます。
 
-* `--http_authenticators` - Specifies which HTTP authenticator module to use.
-  The default is `basic`, but additional modules can be added using the
-  `--modules` option.
+* `--http_credentials` - 受け入れられる認証情報のリスト（JSON形式）を含むテキストファイルへのパスです。これは使用する認証機関によってはオプションとなります。
 
-* `--http_credentials` - The path to a text file which contains a list (in JSON
-  format) of accepted credentials.  This may be optional depending on the
-  authenticator being used.
+* `--authentication_backoff_factor` - エージェントは、指数関数的なバックオフに基づいて、マスターとの認証のタイムアウトを行います。タイムアウトは、`[min, min + factor*2^n]`の範囲でランダムに選択されます（`n`は失敗した試行回数）。これらのパラメータを調整するには、`--authentication_timeout_[min|max|factor]`フラグを設定します。(デフォルト: 1secs)
 
-* `--authentication_backoff_factor` - The agent will time out its authentication
-  with the master based on exponential backoff. The timeout will be randomly
-  chosen within the range `[min, min + factor*2^n]` where `n` is the number of
-  failed attempts. To tune these parameters, set the
-  `--authentication_timeout_[min|max|factor]` flags. (default: 1secs)
+* `--authentication_timeout_min` - エージェントがマスターとの認証を再試行するまでの最小待機時間です。詳細は `--authentication_backoff_factor` を参照してください。(デフォルト: 5secs)
 
-* `--authentication_timeout_min` - The minimum amount of time the agent waits
-  before retrying authenticating with the master. See
-  `--authentication_backoff_factor` for more details. (default: 5secs)
+* `--authentication_timeout_max` - マスターとの認証を再試行するまでのエージェントの最大待機時間です。詳細は `--authentication_backoff_factor` を参照してください。(デフォルト: 1mins)
 
-* `--authentication_timeout_max` - The maximum amount of time the agent waits
-  before retrying authenticating with the master. See
-  `--authentication_backoff_factor` for more details. (default: 1mins)
+### スケジューラードライバー
+* `--authenticatee` - マスターの `--authenticators` オプションと同じで、使用するモジュールを指定します。デフォルトでは`crammd5`が使用されます。
 
-### Scheduler Driver
+* `--authentication_backoff_factor` - スケジューラは、指数関数的なバックオフに基づいて、マスターとの認証のタイムアウトを行います。タイムアウトは、`[min, min + factor*2^n]`の範囲内でランダムに選択されます（`n`は失敗した試行回数）。これらのパラメータを調整するには、`--authentication_timeout_[min|max|factor]`フラグを設定します。(デフォルト: 1secs)
 
-* `--authenticatee` - Analog to the master's `--authenticators` option to
-  specify what module to use.  Defaults to `crammd5`.
+* `--authentication_timeout_min` - スケジューラがマスターとの認証を再試行するまでの最小待機時間です。詳細は `--authentication_backoff_factor` を参照してください。(デフォルト: 5secs)
 
-* `--authentication_backoff_factor` - The scheduler will time out its
-  authentication with the master based on exponential backoff. The timeout will
-  be randomly chosen within the range `[min, min + factor*2^n]` where `n` is
-  the number of failed attempts. To tune these parameters, set the
-  `--authentication_timeout_[min|max|factor]` flags. (default: 1secs)
+* `--authentication_timeout_max` - スケジューラーがマスターとの認証を再試行するまでの最大待機時間です。詳細は `--authentication_backoff_factor` を参照してください。(デフォルト: 1mins)
 
-* `--authentication_timeout_min` - The minimum amount of time the scheduler
-  waits before retrying authenticating with the master. See
-  `--authentication_backoff_factor` for more details. (default: 5secs)
+### 複数のHTTP認証機能
+複数のHTTP認証子をMesosマスターとエージェントにロードすることができます。複数の認証子をロードするには、`--http_authenticators` フラグを使用して、カンマ区切りのリストとして指定します。認証子は連続して呼び出され、最初に成功した認証の結果が返されます。
 
-* `--authentication_timeout_max` - The maximum amount of time the scheduler
-  waits before retrying authenticating with the master. See
-  `--authentication_backoff_factor` for more details. (default: 1mins)
+カスタム認証モジュールに加えて、デフォルトのベーシック HTTP 認証モジュールを指定する場合は、認証モジュールのリストに `basic` という名前を追加します。カスタム認証モジュールに加えて、デフォルトの JWT HTTP 認証モジュールを指定する場合は、`jwt` という名前を認証モジュールリストに追加します。
 
-### Multiple HTTP Authenticators
+### エグゼキューター
+エージェントでHTTPエクゼキュータ認証が有効になっている場合、HTTPエクゼキュータからのすべてのリクエストは認証されなければなりません。これには、デフォルトのエクゼキュータ、HTTP コマンドエクゼキュータ、およびカスタム HTTP エクゼキュータが含まれます。デフォルトでは、エージェントの JSON Web Token (JWT) HTTP 認証機能が、エクゼキュータとオペレーターの API エンドポイントの両方でエクゼキュータ認証を処理するためにロードされます。HTTP API を使用しないコマンドおよびカスタムエクゼキュータは、認証されないままです。
 
-Multiple HTTP authenticators may be loaded into the Mesos master and agent. In
-order to load multiple authenticators, specify them as a comma-separated list
-using the `--http_authenticators` flag. The authenticators will be called
-serially, and the result of the first successful authentication attempt will be
-returned.
-
-If you wish to specify the default basic HTTP authenticator in addition to
-custom authenticator modules, add the name `basic` to your authenticator list.
-To specify the default JWT HTTP authenticator in addition to custom
-authenticator modules, add the name `jwt` to your authenticator list.
-
-### Executor
-
-If HTTP executor authentication is enabled on the agent, then all requests from
-HTTP executors must be authenticated. This includes the default executor, HTTP
-command executors, and custom HTTP executors. By default, the agent's JSON web
-token (JWT) HTTP authenticator is loaded to handle executor authentication on
-both the executor and operator API endpoints. Note that command and custom
-executors not using the HTTP API will remain unauthenticated.
-
-When a secret key is loaded via the `--jwt_secret_key` flag, the agent will
-generate a default JWT for each executor before it is launched. This token is
-passed into the executor's environment via the
-`MESOS_EXECUTOR_AUTHENTICATION_TOKEN` environment variable. In order to
-authenticate with the agent, the executor should place this token into the
-`Authorization` header of all its requests as follows:
+`--jwt_secret_key` フラグで秘密鍵がロードされると、エージェントは起動前に各エクゼキュータ用のデフォルト JWT を生成します。このトークンは、環境変数`MESOS_EXECUTOR_AUTHENTICATION_TOKEN`を介してエクゼキュータの環境に渡されます。エージェントで認証するために、エクゼキュータはこのトークンをすべてのリクエストの`Authorization`ヘッダに以下のように配置する必要があります。
 
         Authorization: Bearer MESOS_EXECUTOR_AUTHENTICATION_TOKEN
 
-In order to upgrade an existing cluster to require executor authentication, the
-following procedure should be followed:
+既存のクラスターをアップグレードしてエクゼキュータ認証を必要とするようにするには、以下の手順を踏む必要があります。
+1. すべてのエージェントをアップグレードし、各エージェントに `--jwt_secret_key` フラグで暗号鍵を提供します。この鍵は、HMAC-SHA256 方式で実行者認証トークンに署名するために使用されます。
 
-1. Upgrade all agents, and provide each agent with a cryptographic key via the
-   `--jwt_secret_key` flag. This key will be used to sign executor
-   authentication tokens using the HMAC-SHA256 procedure.
+2. 実行者認証を有効にするには、すべての HTTP 実行者が実行者認証トークンを持ち、認証をサポートする必要があります。そのためには、アップグレード前にすでに稼働していたエクゼキュータを再起動する必要があります。この作業は一度に行うこともできますし、クラスタを中間的な状態にしておいてエクゼキュータが徐々に切り替わるようにすることもできます。
 
-2. Before executor authentication can be enabled successfully, all HTTP
-   executors must have executor authentication tokens in their environment and
-   support authentication. To accomplish this, executors which were already
-   running before the upgrade must be restarted. This could either be done all
-   at once, or the cluster may be left in this intermediate state while
-   executors gradually turn over.
+3. アップグレードされたエージェントによって、稼働中のデフォルト／HTTP コ マンド・エクゼキュータがすべて起動され、カスタム HTTP エクゼキュータもアップグレー ドされたら、`--authenticate_http_executors` フラグを設定してエージェント・ プロセスを再起動できます。これにより、必要な HTTP エグゼキュータの認証が有効になり、すべてのエグゼキュータが認証トークンを持ち、認証をサポートするようになったため、エージェントへのリクエストが正常に認証されるようになります。
 
-3. Once all running default/HTTP command executors have been launched by
-   upgraded agents, and any custom HTTP executors have been upgraded, the agent
-   processes can be restarted with the `--authenticate_http_executors` flag set.
-   This will enable required HTTP executor authentication, and since all
-   executors now have authentication tokens and support authentication, their
-   requests to the agent will authenticate successfully.
+HTTP エグゼキュータは、ネストされたコンテナ呼び出しを行うために、エージェントオペレータ API を使用します。つまり、HTTPエクゼキュータの認証を無効にしているときに、(`--authenticate_http_readwrite`で)v1エージェントオペレータAPIの認証を有効にすると、HTTPエクゼキュータが正常に動作しなくなります。
 
-Note that HTTP executors make use of the agent operator API in order to make
-nested container calls. This means that authentication of the v1 agent operator
-API should not be enabled (via `--authenticate_http_readwrite`) when HTTP
-executor authentication is disabled, or HTTP executors will not be able to
-function correctly.
+### フレームワーク
+フレームワーク認証を有効にした場合、Mesosマスターに登録する際に認証情報を提供するように各フレームワークを設定する必要があります。この設定方法はフレームワークによって異なりますので、詳細はフレームワークのドキュメントを参照してください。
 
-### Framework
+フレームワークの開発者にとって、認証のサポートは簡単です。スケジューラドライバは、そのコンストラクタに`Credential`オブジェクトが渡されると、認証の詳細を処理します。認証されたプリンシパルに基づく[認可](authorization.md)を行うために、フレームワーク開発者は登録時に`Credential.principal`を`FrameworkInfo.principal`にコピーする必要があります。
 
-If framework authentication is enabled, each framework must be configured to
-supply authentication credentials when registering with the Mesos master. How to
-configure this differs between frameworks; consult your framework's
-documentation for more information.
+## CRAM-MD5 の例
 
-As a framework developer, supporting authentication is straightforward: the
-scheduler driver handles the details of authentication when a `Credential`
-object is passed to its constructor. To enable [authorization](authorization.md)
-based on the authenticated principal, the framework developer should also copy
-the `Credential.principal` into `FrameworkInfo.principal` when registering.
-
-## CRAM-MD5 Example
-
-1. Create the master's credentials file with the following content:
+1. 以下の内容でマスターの資格情報ファイルを作成します。
 
         {
           "credentials" : [
@@ -236,24 +113,23 @@ the `Credential.principal` into `FrameworkInfo.principal` when registering.
           ]
         }
 
-2. Start the master using the credentials file (assuming the file is `/home/user/credentials`):
+2. 資格情報ファイルを使用してマスターを起動します（ファイルは`/home/user/credentials`であると仮定）
 
         ./bin/mesos-master.sh --ip=127.0.0.1 --work_dir=/var/lib/mesos --authenticate --authenticate_agents --credentials=/home/user/credentials
 
-3. Create another file with a single credential in it (`/home/user/agent_credential`):
+3. 1つのクレデンシャルを入れた別のファイル（`/home/user/agent_credential`）を作成します。
 
         {
           "principal": "principal1",
           "secret": "secret1"
         }
 
-4. Start the agent:
+4. エージェントの起動:
 
         ./bin/mesos-agent.sh --master=127.0.0.1:5050 --credential=/home/user/agent_credential
 
-5. Your new agent should have now successfully authenticated with the master.
+5. 新しいエージェントは、マスターとの認証に成功しているはずです。
 
-6. You can test out framework authentication using one of the test frameworks
-provided with Mesos as follows:
+6. フレームワークの認証をテストするには、Mesosで提供されているテストフレームワークを以下のように使用します。
 
         MESOS_AUTHENTICATE=true DEFAULT_PRINCIPAL=principal2 DEFAULT_SECRET=secret2 ./src/test-framework --master=127.0.0.1:5050
